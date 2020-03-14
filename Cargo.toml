@@ -1,0 +1,32 @@
+[package]
+authors = ["Todd Stellanova <tstellanova@users.noreply.github.com>"]
+edition = "2018"
+readme = "README.md"
+name = "durandal_play"
+version = "0.1.0"
+
+[dependencies]
+embedded-hal = "0.2.3"
+cortex-m = "0.6.0"
+cortex-m-rt = "0.6.10"
+cortex-m-semihosting = "0.3.3"
+panic-halt = "0.2.0"
+panic-semihosting = "0.5.3"
+cortex-m-log = { version = "0.6.1", features = ["log-integration", "itm", "semihosting"] }
+rand_core = "0.5.1"
+
+shared-bus = {version = "0.1.4", features = ["cortexm"] }
+ssd1306 = "0.2.6"
+embedded-graphics = "0.4.9"
+arrayvec = {version = "0.5.1", default-features = false}
+
+ms5611-spi = "0.1.0"
+
+
+# stm32 family specialization:
+stm32h7 = { version = "0.10.0", features = ["stm32h743"] }
+#stm32h7xx-hal = { version = "0.3.0", features = ["stm32h743", "rt"] }
+#stm32h7xx-hal = { git = "https://github.com/stm32-rs/stm32h7xx-hal", features = ["stm32h743", "rt"] }
+stm32h7xx-hal = { path = "../stm32h7xx-hal",  features = ["stm32h743", "rt"] }
+
+
