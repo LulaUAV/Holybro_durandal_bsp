@@ -30,6 +30,9 @@ type I2c4PortType = p_hal::i2c::I2c<I2C4,
 pub type ExternI2cPortAType = I2c4PortType;
 
 
+//- SPI4 is internal barometer:  `(PE13, PE6, PE2)`
+//   - MS5611 CS1: `PF10`
+//Pins<SPI> for (SCK, MISO, MOSI)
 pub type Spi4PortType = p_hal::spi::Spi<SPI4,
     (p_hal::gpio::gpioe::PE2<p_hal::gpio::Alternate<p_hal::gpio::AF5>>,
      p_hal::gpio::gpioe::PE13<p_hal::gpio::Alternate<p_hal::gpio::AF5>>,

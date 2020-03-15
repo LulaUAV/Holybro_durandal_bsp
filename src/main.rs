@@ -91,10 +91,11 @@ fn setup_peripherals() ->  (
     let delay_source =  p_hal::delay::Delay::new(cp.SYST, clocks);
 
     let gpiob = dp.GPIOB.split(&mut ccdr.ahb4);
+    let gpioc = dp.GPIOC.split(&mut ccdr.ahb4);
     let gpioe = dp.GPIOE.split(&mut ccdr.ahb4);
     let gpiof = dp.GPIOF.split(&mut ccdr.ahb4);
 
-    let user_led1 = gpiob.pb0.into_push_pull_output(); //TODO
+    let user_led1 = gpiob.pb1.into_push_pull_output(); // FMU "B/E" light on durandal
 
     let i2c4_port = {
         let scl = gpiof.pf14.into_alternate_af4().set_open_drain();
@@ -102,14 +103,13 @@ fn setup_peripherals() ->  (
         p_hal::i2c::I2c::i2c4(dp.I2C4, (scl, sda), 400.khz(), &ccdr)
     };
 
+    //TODO bump this to 20 MHz?
     let spi4_port =  {
+        let sck = gpioe.pe2.into_alternate_af5();
         let miso = gpioe.pe13.into_alternate_af5();
         let mosi = gpioe.pe6.into_alternate_af5();
-        let sck = gpioe.pe2.into_alternate_af5();
-        p_hal::spi::Spi::spi4(dp.SPI4, (sck, miso, mosi), embedded_hal::spi::MODE_0, 2.mhz(), &ccdr)
+        p_hal::spi::Spi::spi4(dp.SPI4, (sck, miso, mosi), embedded_hal::spi::MODE_3, 2.mhz(), &ccdr)
     };
-
-
     let mut spi4_cs1 = gpiof.pf10.into_push_pull_output();
     spi4_cs1.set_high().unwrap();
 
@@ -121,15 +121,13 @@ fn setup_peripherals() ->  (
 const SCREEN_HEIGHT: i32 = 32;
 
 
+
 #[entry]
 fn main() -> ! {
 
     let (i2c4_port,  spi4_port, spi4_cs1,  mut user_led1, mut delay_source) =
         setup_peripherals();
-    #[cfg(debug_assertions)]
-
-    //TODO need SPI pins for this
-
+    
     let i2c_bus4 = shared_bus::CortexMBusManager::new(i2c4_port);
 
     let mut format_buf = ArrayString::<[u8; 20]>::new();
@@ -139,25 +137,30 @@ fn main() -> ! {
     disp.flush().unwrap();
 
     let _ = user_led1.set_low();
-    delay_source.delay_ms(1u8);
 
-    let mut msbaro  = Ms5611::new(spi4_port,
-                                  spi4_cs1,
-                                  &mut delay_source).unwrap();
+    // wait a bit for sensors to power up
+    delay_source.delay_ms(250u8);
+
+    let mut msbaro = Ms5611::new(spi4_port,
+                        spi4_cs1,
+                        &mut delay_source).unwrap();
 
     let mut loop_count = 0;
     loop {
+
         let ms_sample = msbaro
-            .get_second_order_sample(Oversampling::OS_2048, &mut delay_source)
-            .unwrap();
-        let ms_press = ms_sample.pressure;
+            .get_second_order_sample(Oversampling::OS_2048, &mut delay_source);
+        let ms_press = if ms_sample.is_ok() {
+            ms_sample.unwrap().pressure
+        }
+        else { 0 };
 
         //let bmp_press = 10.0 * barometer.pressure_one_shot();
-        debug_println!("press: {:.2}", ms_press);
+        //debug_println!("press: {:.2}", ms_press);
 
         //overdraw the label
         format_buf.clear();
-        if fmt::write(&mut format_buf, format_args!("{}", loop_count)).is_ok() {
+        if fmt::write(&mut format_buf, format_args!("{}", ms_press)).is_ok() {
             disp.draw(
                 Font6x8::render_str(format_buf.as_str())
                     .with_stroke(Some(1u8.into()))
@@ -168,7 +171,7 @@ fn main() -> ! {
         disp.flush().unwrap();
 
         let _ = user_led1.toggle();
-        delay_source.delay_ms(250u8);
+        delay_source.delay_ms(100u8);
         loop_count +=1;
     }
 
