@@ -20,8 +20,8 @@ ssd1306 = "0.2.6"
 embedded-graphics = "0.4.9"
 arrayvec = {version = "0.5.1", default-features = false}
 
-ms5611-spi = "0.1.0"
-
+ms5611-spi =  { git = "https://github.com/tstellanova/ms5611-ehal" }
+#ms5611-spi = { path = "../ms5611-ehal" }
 
 # stm32 family specialization:
 stm32h7 = { version = "0.10.0", features = ["stm32h743"] }

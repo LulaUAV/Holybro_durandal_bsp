@@ -20,7 +20,6 @@ use p_hal::prelude::*;
 use p_hal::stm32;
 
 
-use embedded_hal::digital::v1_compat::OldOutputPin;
 use embedded_hal::digital::v2::OutputPin;
 use embedded_hal::digital::v2::ToggleableOutputPin;
 use embedded_hal::blocking::delay::DelayMs;
@@ -29,26 +28,23 @@ use embedded_hal::blocking::delay::DelayMs;
 use ssd1306::prelude::*;
 use embedded_graphics::fonts::Font6x8;
 use embedded_graphics::prelude::*;
-// use embedded_graphics::primitives::{Rect};
 use core::fmt;
 use arrayvec::ArrayString;
 
-
-// use cortex_m::asm::bkpt;
-use p_hal::time::{U32Ext, Hertz};
+use p_hal::time::{U32Ext};
 
 /// Sensors
-use ms5611_spi::{Ms5611, Oversampling};
+use ms5611_spi as ms5611;
+use ms5611::{Ms5611, Oversampling};
 
 #[macro_use]
 extern crate cortex_m_rt;
 
+#[allow(dead_code)]
 mod port_types;
-use port_types::{ExternI2cPortAType};
+use port_types::{ExternI2cPortAType, Spi4PortType};
 
-struct LameError {
 
-}
 
 // cortex-m-rt is setup to call DefaultHandler for a number of fault conditions
 // // we can override this in debug mode for handy debugging
@@ -66,12 +62,12 @@ fn HardFault(ef: &ExceptionFrame) -> ! {
 }
 
 
+
 fn setup_peripherals() ->  (
     // i2c4:
     ExternI2cPortAType,
-    //impl embedded_hal::blocking::i2c::Read + embedded_hal::blocking::i2c::Write + embedded_hal::blocking::i2c::WriteRead,
     // spi4_port
-    impl  embedded_hal::blocking::spi::Write<u8> + embedded_hal::blocking::spi::Transfer<u8>,
+    Spi4PortType,
     // spi4_cs1
     impl OutputPin + ToggleableOutputPin ,
     // user_led1
@@ -111,8 +107,8 @@ fn setup_peripherals() ->  (
         let mosi = gpioe.pe6.into_alternate_af5();
         let sck = gpioe.pe2.into_alternate_af5();
         p_hal::spi::Spi::spi4(dp.SPI4, (sck, miso, mosi), embedded_hal::spi::MODE_0, 2.mhz(), &ccdr)
-        // miso, mosi, sck: (PE13, PE6, PE2)
     };
+
 
     let mut spi4_cs1 = gpiof.pf10.into_push_pull_output();
     spi4_cs1.set_high().unwrap();
@@ -121,7 +117,7 @@ fn setup_peripherals() ->  (
 }
 
 // const LABEL_TEXT_HEIGHT: i32 = 5;
-const SCREEN_WIDTH: i32 = 128;
+// const SCREEN_WIDTH: i32 = 128;
 const SCREEN_HEIGHT: i32 = 32;
 
 
@@ -143,27 +139,21 @@ fn main() -> ! {
     disp.flush().unwrap();
 
     let _ = user_led1.set_low();
-    //d_println!(log, "ready!");
     delay_source.delay_ms(1u8);
 
-    //MS5611 CS1: `PF10`
-    //let mut msbaro  = Ms5611::new(spi4_port, spi4_cs1.into(), delay_source).unwrap();
-
-    let spi4_cs1_v1 = OldOutputPin::new(spi4_cs1);
     let mut msbaro  = Ms5611::new(spi4_port,
-                                  spi4_cs1_v1,
-                                  delay_source).unwrap();
-
-    let _sample = msbaro
-        .get_second_order_sample(Oversampling::OS_2048)
-        .unwrap();
+                                  spi4_cs1,
+                                  &mut delay_source).unwrap();
 
     let mut loop_count = 0;
     loop {
-        // let abs_press = 10.0 * barometer.pressure_one_shot();
-        // #[cfg(debug_assertions)]
-        // hprintln!("press: {:.2}", abs_press).unwrap();
+        let ms_sample = msbaro
+            .get_second_order_sample(Oversampling::OS_2048, &mut delay_source)
+            .unwrap();
+        let ms_press = ms_sample.pressure;
 
+        //let bmp_press = 10.0 * barometer.pressure_one_shot();
+        debug_println!("press: {:.2}", ms_press);
 
         //overdraw the label
         format_buf.clear();
@@ -176,9 +166,6 @@ fn main() -> ! {
             );
         }
         disp.flush().unwrap();
-
-        // xpos = xpos + BAR_WIDTH;
-        // if xpos > SCREEN_WIDTH { xpos = 0; }
 
         let _ = user_led1.toggle();
         delay_source.delay_ms(250u8);
