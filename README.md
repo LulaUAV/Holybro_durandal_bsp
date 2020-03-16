@@ -25,7 +25,9 @@ This is very much work-in-progress
 - [x] Internal SPI4 bus access
 - [x] ms5611 internal barometer readings (requires updated ms5611-ehal driver)
 - [x] blink front panel indicator LED
-- [x] Debug serial console output (on dronecode connector serial port)
+- [x] Debug serial console output (on dronecode connector serial port `UART7`)
+- [x] Access internal `I2C3` bus
+- [x] IST8310 internal magnetometer reading (use new ist8310 crate)
 - [ ] All internal SPI bus access
 - [ ] External SPI bus access
 - [ ] Internal I2C bus access
@@ -33,7 +35,6 @@ This is very much work-in-progress
 - [ ] Telem 1, 2, 3, 4 serial port access (uart)
 - [ ] ICM20689 internal 6DOF reading (no existing ehal driver)
 - [ ] BMI088 internal 6DOF reading internal SPI (no existing ehal driver)
-- [ ] IST8310 internal mag reading (no existing ehal driver)
 - [ ] SDMMC read/write
 - [ ] Running on RTOS
 - [ ] USB-C serial I/O
@@ -63,9 +64,9 @@ This is very much work-in-progress
 Format: `(SCL, SDA)`
 - External i2c bus labeled "GPS" is `I2C1`: `(PB8, PB9)`
 - External i2c bus labeled "I2C B" is  `I2C2`: `(PF1, PF0)`
-- Internal i2c bus is `I2C3`: `(PH7, PH8)`
+- Internal i2c bus is `I2C3`: `(PH7, PH8)` ... used by mag
 - External i2c bus labeled "I2C A" is `I2C4`: `(PF14, PF15)`
- 
+
 ### SPI Buses
 Format:  `(SCK, MISO, MOSI)` 
 - SPI1 is 2 MHz internal sensors: `(PG11, PA6, PD7)`

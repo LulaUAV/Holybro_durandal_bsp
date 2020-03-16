@@ -23,6 +23,9 @@ arrayvec = {version = "0.5.1", default-features = false}
 ms5611-spi =  { git = "https://github.com/tstellanova/ms5611-ehal" }
 #ms5611-spi = { path = "../ms5611-ehal" }
 
+#ist8310 =  { git = "https://github.com/tstellanova/ist8310" }
+ist8310 = { path = "../ist8310"}
+
 # stm32 family specialization:
 stm32h7 = { version = "0.10.0", features = ["stm32h743"] }
 #stm32h7xx-hal = { version = "0.3.0", features = ["stm32h743", "rt"] }

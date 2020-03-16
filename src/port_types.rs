@@ -23,6 +23,7 @@ type I2c3PortType = p_hal::i2c::I2c<I2C3,
 pub type InternalI2cPortType = I2c3PortType;
 
 
+
 type I2c4PortType = p_hal::i2c::I2c<I2C4,
     (p_hal::gpio::gpiof::PF14<p_hal::gpio::Alternate<p_hal::gpio::AF4>>,
      p_hal::gpio::gpiof::PF15<p_hal::gpio::Alternate<p_hal::gpio::AF4>>)
