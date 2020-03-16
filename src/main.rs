@@ -16,19 +16,23 @@ use stm32h7xx_hal as p_hal;
 #[macro_use]
 mod macros;
 
-use p_hal::prelude::*;
-use p_hal::stm32;
+
+use p_hal::{stm32, prelude::*};
 
 
-use embedded_hal::digital::v2::OutputPin;
-use embedded_hal::digital::v2::ToggleableOutputPin;
-use embedded_hal::blocking::delay::DelayMs;
+use embedded_hal as ehal;
+use ehal::digital::v2::OutputPin;
+use ehal::digital::v2::ToggleableOutputPin;
+use ehal::blocking::delay::DelayMs;
 
 // SSD1306 external OLED display (for debug)
 use ssd1306::prelude::*;
 use embedded_graphics::fonts::Font6x8;
 use embedded_graphics::prelude::*;
+
+
 use core::fmt;
+use core::fmt::Write;
 use arrayvec::ArrayString;
 
 use p_hal::time::{U32Ext};
@@ -42,8 +46,10 @@ extern crate cortex_m_rt;
 
 #[allow(dead_code)]
 mod port_types;
-use port_types::{ExternI2cPortAType, Spi4PortType};
 
+use port_types::{ExternI2cPortAType, Spi4PortType};
+use p_hal::serial::config::{WordLength, Parity, StopBits};
+use crate::port_types::Uart7PortType;
 
 
 // cortex-m-rt is setup to call DefaultHandler for a number of fault conditions
@@ -70,6 +76,9 @@ fn setup_peripherals() ->  (
     Spi4PortType,
     // spi4_cs1
     impl OutputPin + ToggleableOutputPin ,
+    // UART7 -- debug serial port
+    Uart7PortType,
+    //impl ehal::serial::Read<u8> + ehal::serial::Write<u8> ,
     // user_led1
     impl OutputPin + ToggleableOutputPin,
     // delay_source
@@ -91,7 +100,7 @@ fn setup_peripherals() ->  (
     let delay_source =  p_hal::delay::Delay::new(cp.SYST, clocks);
 
     let gpiob = dp.GPIOB.split(&mut ccdr.ahb4);
-    let gpioc = dp.GPIOC.split(&mut ccdr.ahb4);
+    let _gpioc = dp.GPIOC.split(&mut ccdr.ahb4);
     let gpioe = dp.GPIOE.split(&mut ccdr.ahb4);
     let gpiof = dp.GPIOF.split(&mut ccdr.ahb4);
 
@@ -100,7 +109,8 @@ fn setup_peripherals() ->  (
     let i2c4_port = {
         let scl = gpiof.pf14.into_alternate_af4().set_open_drain();
         let sda = gpiof.pf15 .into_alternate_af4().set_open_drain();
-        p_hal::i2c::I2c::i2c4(dp.I2C4, (scl, sda), 400.khz(), &ccdr)
+        //p_hal::i2c::I2c::i2c4(dp.I2C4, (scl, sda), 400.khz(), &ccdr)
+        dp.I2C4.i2c((scl, sda), 400.khz(), &ccdr)
     };
 
     //TODO bump this to 20 MHz?
@@ -108,12 +118,35 @@ fn setup_peripherals() ->  (
         let sck = gpioe.pe2.into_alternate_af5();
         let miso = gpioe.pe13.into_alternate_af5();
         let mosi = gpioe.pe6.into_alternate_af5();
-        p_hal::spi::Spi::spi4(dp.SPI4, (sck, miso, mosi), embedded_hal::spi::MODE_3, 2.mhz(), &ccdr)
+        dp.SPI4.spi((sck, miso, mosi), ehal::spi::MODE_3, 2.mhz(), &ccdr)
+        //p_hal::spi::Spi::spi4(dp.SPI4, (sck, miso, mosi), ehal::spi::MODE_3, 2.mhz(), &ccdr)
     };
     let mut spi4_cs1 = gpiof.pf10.into_push_pull_output();
     spi4_cs1.set_high().unwrap();
 
-    (i2c4_port,  spi4_port, spi4_cs1,  user_led1, delay_source)
+    //UART7 is debug (dronecode port): `(PF6, PE8)`
+    //        pins: PINS,
+    //         config: config::Config,
+    //         ccdr: &mut Ccdr,
+    let uart7_port = {
+        let config =   p_hal::serial::config::Config {
+            baudrate: 57_600_u32.bps(),
+            wordlength: WordLength::DataBits8,
+            parity: Parity::ParityNone,
+            stopbits: StopBits::STOP1
+        };
+        let rx = gpiof.pf6.into_alternate_af7();
+        let tx = gpioe.pe8.into_alternate_af7();
+        dp.UART7.usart((tx,rx),config, &mut ccdr).unwrap()
+    };
+
+
+    // let serial = dp
+    //     .USART3
+    //     .usart((tx, rx), serial::config::Config::default(), &mut ccdr)
+    //     .unwrap();
+
+    (i2c4_port,  spi4_port, spi4_cs1,  uart7_port, user_led1, delay_source)
 }
 
 // const LABEL_TEXT_HEIGHT: i32 = 5;
@@ -125,9 +158,10 @@ const SCREEN_HEIGHT: i32 = 32;
 #[entry]
 fn main() -> ! {
 
-    let (i2c4_port,  spi4_port, spi4_cs1,  mut user_led1, mut delay_source) =
+    let (i2c4_port,  spi4_port, spi4_cs1,
+         uart7_port,mut user_led1, mut delay_source) =
         setup_peripherals();
-    
+
     let i2c_bus4 = shared_bus::CortexMBusManager::new(i2c4_port);
 
     let mut format_buf = ArrayString::<[u8; 20]>::new();
@@ -135,6 +169,8 @@ fn main() -> ! {
     disp.init().unwrap();
     disp.set_rotation(DisplayRotation::Rotate0).unwrap();
     disp.flush().unwrap();
+
+    let (mut po_tx, mut _po_rx) = uart7_port.split();
 
     let _ = user_led1.set_low();
 
@@ -161,8 +197,13 @@ fn main() -> ! {
         //overdraw the label
         format_buf.clear();
         if fmt::write(&mut format_buf, format_args!("{}", ms_press)).is_ok() {
+            let le_str = format_buf.as_str();
+            po_tx.write_str(le_str).unwrap();
+            po_tx.write_str("\r\n").unwrap();
+            //writeln!(po_tx, le_str).unwrap();
+
             disp.draw(
-                Font6x8::render_str(format_buf.as_str())
+                Font6x8::render_str(le_str)
                     .with_stroke(Some(1u8.into()))
                     .translate(Coord::new(20, SCREEN_HEIGHT  / 2))
                     .into_iter(),
@@ -171,7 +212,7 @@ fn main() -> ! {
         disp.flush().unwrap();
 
         let _ = user_led1.toggle();
-        delay_source.delay_ms(100u8);
+        delay_source.delay_ms(1u8);
         loop_count +=1;
     }
 

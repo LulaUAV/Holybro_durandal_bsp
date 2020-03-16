@@ -7,7 +7,7 @@ use stm32::I2C3;
 use stm32::I2C4;
 
 use stm32::SPI4;
-
+use stm32::UART7;
 
 type I2c1PortType = p_hal::i2c::I2c<I2C1,
     (p_hal::gpio::gpiob::PB8<p_hal::gpio::Alternate<p_hal::gpio::AF4>>,
@@ -30,9 +30,6 @@ type I2c4PortType = p_hal::i2c::I2c<I2C4,
 pub type ExternI2cPortAType = I2c4PortType;
 
 
-//- SPI4 is internal barometer:  `(PE13, PE6, PE2)`
-//   - MS5611 CS1: `PF10`
-//Pins<SPI> for (SCK, MISO, MOSI)
 pub type Spi4PortType = p_hal::spi::Spi<SPI4,
     (p_hal::gpio::gpioe::PE2<p_hal::gpio::Alternate<p_hal::gpio::AF5>>,
      p_hal::gpio::gpioe::PE13<p_hal::gpio::Alternate<p_hal::gpio::AF5>>,
@@ -41,10 +38,9 @@ pub type Spi4PortType = p_hal::spi::Spi<SPI4,
 >;
 
 
-// let spi4_port =  {
-// let miso = gpioe.pe13.into_alternate_af5();
-// let mosi = gpioe.pe6.into_alternate_af5();
-// let sck = gpioe.pe2.into_alternate_af5();
-// p_hal::spi::Spi::spi4(dp.SPI4, (sck, miso, mosi), embedded_hal::spi::MODE_0, 2.mhz(), &ccdr)
-//
-// };
+
+pub type Uart7PortType = p_hal::serial::Serial<UART7,
+    ( p_hal::gpio::gpioe::PE8<p_hal::gpio::Alternate<p_hal::gpio::AF7>>,
+    p_hal::gpio::gpiof::PF6<p_hal::gpio::Alternate<p_hal::gpio::AF7>>
+    )
+    >;

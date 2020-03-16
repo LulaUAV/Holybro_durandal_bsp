@@ -25,6 +25,7 @@ This is very much work-in-progress
 - [x] Internal SPI4 bus access
 - [x] ms5611 internal barometer readings (requires updated ms5611-ehal driver)
 - [x] blink front panel indicator LED
+- [x] Debug serial console output (on dronecode connector serial port)
 - [ ] All internal SPI bus access
 - [ ] External SPI bus access
 - [ ] Internal I2C bus access
@@ -108,6 +109,17 @@ Format: `(RX, TX)`
 - `PC7` is the blue led marked "ACT"
 - `PC6` is the green led marked "PWR"
 - `PB1` is the red led marked "B/E"
+
+### UARTs / USARTs
+Format: `(RX, TX)` , `(CTS, RTS)`
+
+- USART1 is GPS1: `(PB7, PB6)`
+- USART2 is Telem1: `(PD6, PD5)` , `(PD3, PD4)`
+- USART3 is Telem2: `(PD9, PD8)` , `(PD11, PD12)`
+- UART4 is GPS2: `(PD0, PD1)` 
+- USART6 is Telem3: `(PG9, PG14)` with special needs
+- UART7 is debug (dronecode port): `(PF6, PE8)`
+- UART8 is IOMCU: `(PE0, PE1)`
 
 
 ## License
