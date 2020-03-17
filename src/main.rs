@@ -41,6 +41,7 @@ use p_hal::time::{U32Ext};
 use ms5611_spi as ms5611;
 use ms5611::{Ms5611, Oversampling};
 use ist8310::{IST8310};
+use icm20689::{ICM20689};
 
 #[macro_use]
 extern crate cortex_m_rt;
@@ -48,9 +49,8 @@ extern crate cortex_m_rt;
 #[allow(dead_code)]
 mod port_types;
 
-use port_types::{ExternI2cPortAType, Spi4PortType};
+use crate::port_types::{ExternI2cPortAType, InternalI2cPortType, Spi1PortType, Spi4PortType, SpiConfig, Uart7PortType, HalI2cError, HalSpiError};
 use p_hal::serial::config::{WordLength, Parity, StopBits};
-use crate::port_types::{Uart7PortType, InternalI2cPortType};
 
 
 // cortex-m-rt is setup to call DefaultHandler for a number of fault conditions
@@ -68,20 +68,32 @@ fn HardFault(ef: &ExceptionFrame) -> ! {
     panic!("{:#?}", ef);
 }
 
+// const LABEL_TEXT_HEIGHT: i32 = 5;
+// const SCREEN_WIDTH: i32 = 128;
+const SCREEN_HEIGHT: i32 = 32;
+
 
 
 fn setup_peripherals() ->  (
     // i2c3
-    InternalI2cPortType,
+    // InternalI2cPortType
+    impl ehal::blocking::i2c::Read<Error = HalI2cError> + ehal::blocking::i2c::Write<Error = HalI2cError> + ehal::blocking::i2c::WriteRead<Error = HalI2cError>,
     // i2c4
-    ExternI2cPortAType,
-    // spi4_port
-    Spi4PortType,
+    // ExternI2cPortAType,
+    impl ehal::blocking::i2c::Read<Error = HalI2cError> + ehal::blocking::i2c::Write<Error = HalI2cError> + ehal::blocking::i2c::WriteRead<Error = HalI2cError>,
+
+    // spi1
+    //Spi1PortType,
+    impl ehal::blocking::spi::Transfer<u8, Error=HalSpiError> + ehal::blocking::spi::Write<u8, Error=HalSpiError>,
+
+    // spi4
+    //Spi4PortType,
+    impl ehal::blocking::spi::Transfer<u8, Error=HalSpiError> + ehal::blocking::spi::Write<u8, Error=HalSpiError>,
+
     // spi4_cs1
-    impl OutputPin + ToggleableOutputPin ,
+    impl OutputPin,
     // UART7 -- debug serial port
     Uart7PortType,
-    //impl ehal::serial::Read<u8> + ehal::serial::Write<u8> ,
     // user_led1
     impl OutputPin + ToggleableOutputPin,
     // delay_source
@@ -102,10 +114,13 @@ fn setup_peripherals() ->  (
 
     let delay_source =  p_hal::delay::Delay::new(cp.SYST, clocks);
 
+    let gpioa = dp.GPIOA.split(&mut ccdr.ahb4);
     let gpiob = dp.GPIOB.split(&mut ccdr.ahb4);
-    let _gpioc = dp.GPIOC.split(&mut ccdr.ahb4);
+    //let gpioc = dp.GPIOC.split(&mut ccdr.ahb4);
+    let gpiod = dp.GPIOD.split(&mut ccdr.ahb4);
     let gpioe = dp.GPIOE.split(&mut ccdr.ahb4);
     let gpiof = dp.GPIOF.split(&mut ccdr.ahb4);
+    let gpiog = dp.GPIOG.split(&mut ccdr.ahb4);
     let gpioh = dp.GPIOH.split(&mut ccdr.ahb4);
 
     let user_led1 = gpiob.pb1.into_push_pull_output(); // FMU "B/E" light on durandal
@@ -124,7 +139,16 @@ fn setup_peripherals() ->  (
         dp.I2C4.i2c((scl, sda), 400.khz(), &ccdr)
     };
 
-    //TODO bump this to 20 MHz?
+
+    //setup SPI1 for the bulk of SPI-connected internal sensors
+    //TODO need a mutex for the shared SPI1 bus
+    let spi1_port =  {
+        let sck = gpiog.pg11.into_alternate_af5();
+        let miso = gpioa.pa6.into_alternate_af5();
+        let mosi = gpiod.pd7.into_alternate_af5();
+        dp.SPI1.spi((sck, miso, mosi), ehal::spi::MODE_3, 2.mhz(), &ccdr)
+    };
+
     let spi4_port =  {
         let sck = gpioe.pe2.into_alternate_af5();
         let miso = gpioe.pe13.into_alternate_af5();
@@ -133,6 +157,13 @@ fn setup_peripherals() ->  (
     };
     let mut spi4_cs1 = gpiof.pf10.into_push_pull_output();
     spi4_cs1.set_high().unwrap();
+
+
+
+
+    //TODO setup ICM20689 SPI SP1 CS pin PF2 at 2 MHz
+    //TODO setup BMI088 GYRO SP1 CS pin PF4 at 2 MHz
+    //TODO setup BMI088 GYRO SP1 CS pin PG10 at 2 MHz
 
     //UART7 is debug (dronecode port): `(PF6, PE8)`
     let uart7_port = {
@@ -148,17 +179,8 @@ fn setup_peripherals() ->  (
     };
 
 
-    // let serial = dp
-    //     .USART3
-    //     .usart((tx, rx), serial::config::Config::default(), &mut ccdr)
-    //     .unwrap();
-
-    (i2c3_port, i2c4_port, spi4_port, spi4_cs1,  uart7_port, user_led1, delay_source)
+    (i2c3_port , i2c4_port, spi1_port, spi4_port, spi4_cs1,  uart7_port, user_led1, delay_source)
 }
-
-// const LABEL_TEXT_HEIGHT: i32 = 5;
-// const SCREEN_WIDTH: i32 = 128;
-const SCREEN_HEIGHT: i32 = 32;
 
 
 
@@ -167,18 +189,24 @@ fn main() -> ! {
 
     let (i2c3_port,
         i2c4_port,
-        spi4_port, spi4_cs1,
+        spi1_port,
+        spi4_port,
+        spi4_cs1,
         uart7_port,
         mut user_led1,
         mut delay_source) =
         setup_peripherals();
 
+
+    let spi_bus4 = shared_bus::CortexMBusManager::new(spi4_port);
     let i2c_bus3 = shared_bus::CortexMBusManager::new(i2c3_port);
     let i2c_bus4 = shared_bus::CortexMBusManager::new(i2c4_port);
 
     // wait a bit for sensors to power up
     delay_source.delay_ms(250u8);
 
+
+    //let mut tdk_6dof = icm20689::Builder::new_spi(spi_bus1.acquire(),tdk_6dof_cs, tdk_6dof_drdy);
     let mut format_buf = ArrayString::<[u8; 20]>::new();
     let mut disp: GraphicsMode<_> = ssd1306::Builder::new().connect_i2c(i2c_bus4.acquire()).into();
     disp.init().unwrap();
@@ -187,15 +215,13 @@ fn main() -> ! {
 
     let mut mag = IST8310::default(i2c_bus3.acquire()).unwrap();
 
-    let mut msbaro = Ms5611::new(spi4_port,
+    let mut msbaro = Ms5611::new(spi_bus4.acquire(),
                                  spi4_cs1,
                                  &mut delay_source).unwrap();
 
     let (mut po_tx, mut _po_rx) = uart7_port.split();
 
     let _ = user_led1.set_low();
-
-
 
 
 

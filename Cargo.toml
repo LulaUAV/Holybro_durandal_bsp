@@ -26,9 +26,12 @@ ms5611-spi =  { git = "https://github.com/tstellanova/ms5611-ehal" }
 #ist8310 =  { git = "https://github.com/tstellanova/ist8310" }
 ist8310 = { path = "../ist8310"}
 
+#icm20689 =  { git = "https://github.com/tstellanova/icm20689" }
+icm20689 = { path = "../icm20689"}
+
 # stm32 family specialization:
 stm32h7 = { version = "0.10.0", features = ["stm32h743"] }
-#stm32h7xx-hal = { version = "0.3.0", features = ["stm32h743", "rt"] }
+#stm32h7xx-hal = { version = "0.4.0", features = ["stm32h743", "rt"] }
 stm32h7xx-hal = { git = "https://github.com/stm32-rs/stm32h7xx-hal", features = ["stm32h743", "rt"] }
 #stm32h7xx-hal = { path = "../stm32h7xx-hal",  features = ["stm32h743", "rt"] }
 
