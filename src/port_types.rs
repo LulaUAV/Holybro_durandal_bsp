@@ -1,7 +1,8 @@
-use embedded_hal as ehal;
+use embedded_hal as hal;
 
 use stm32h7xx_hal as p_hal;
 use p_hal::stm32;
+use hal::digital::v2::{InputPin, OutputPin};
 
 use stm32::I2C1;
 // use stm32::I2C2;
@@ -16,20 +17,8 @@ use stm32::UART7;
 pub type HalI2cError = p_hal::i2c::Error;
 pub type HalSpiError = p_hal::spi::Error;
 
-pub struct SpiConfig<SPI, CSN, DRDY> {
-    /// the SPI port to use when communicating
-    spi: SPI,
-    /// the Chip Select pin (GPIO output) to use when communicating
-    csn: CSN,
-    /// an input pin (GPIO input) that indicates when data is available (Data Ready)
-    drdy: DRDY,
-}
 
-/// A filler type for when the CSN pin is unnecessary
-pub struct NoCsn;
 
-/// A filler type for when the DRDY pin is unnecessary
-pub struct NoDrdy;
 
 
 // type SharedBusType<T> = BusManager<shared_bus::BusMutex<cell::RefCell<T>>, T>;

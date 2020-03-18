@@ -41,7 +41,7 @@ use p_hal::time::{U32Ext};
 use ms5611_spi as ms5611;
 use ms5611::{Ms5611, Oversampling};
 use ist8310::{IST8310};
-use icm20689::{ICM20689};
+// use icm20689::{ICM20689};
 
 #[macro_use]
 extern crate cortex_m_rt;
@@ -49,8 +49,12 @@ extern crate cortex_m_rt;
 #[allow(dead_code)]
 mod port_types;
 
-use crate::port_types::{ExternI2cPortAType, InternalI2cPortType, Spi1PortType, Spi4PortType, SpiConfig, Uart7PortType, HalI2cError, HalSpiError};
+use crate::port_types::{Uart7PortType, HalI2cError, HalSpiError, Spi1PortType };
 use p_hal::serial::config::{WordLength, Parity, StopBits};
+use embedded_hal::digital::v2::InputPin;
+use cortex_m::asm::bkpt;
+use stm32h7xx_hal::rcc::PllConfigStrategy;
+use stm32h7xx_hal::pwr::VoltageScale;
 
 
 // cortex-m-rt is setup to call DefaultHandler for a number of fault conditions
@@ -86,6 +90,13 @@ fn setup_peripherals() ->  (
     //Spi1PortType,
     impl ehal::blocking::spi::Transfer<u8, Error=HalSpiError> + ehal::blocking::spi::Write<u8, Error=HalSpiError>,
 
+    (
+        //spi1_cs_tdk
+        impl OutputPin,
+
+        //spi1_drdy_tdk
+        impl InputPin,
+    ),
     // spi4
     //Spi4PortType,
     impl ehal::blocking::spi::Transfer<u8, Error=HalSpiError> + ehal::blocking::spi::Write<u8, Error=HalSpiError>,
@@ -103,11 +114,41 @@ fn setup_peripherals() ->  (
     let cp = cortex_m::Peripherals::take().unwrap();
 
     // Set up the system clock
-    let rcc = dp.RCC.constrain();
+    // For Durandal we know we have:
+    // - 16 MHz xtal HSE
+    // - SYSCLK of 480 MHz (processor max)
+    // - HCLK of SYSCLK/2 (240 MHz)
+    // - (PCLK1, PCLK2, PCLK3, PCLK4) is HCLK/2 (120 MHz)
+    // - PLL1P = PLL1_VCO/2  = 960 MHz / 2   = 480 MHz
+    // - PLL1Q = PLL1_VCO/4  = 960 MHz / 4   = 240 MHz
+    // - PLL1R = PLL1_VCO/8  = 960 MHz / 8   = 120 MHz
+    const LE_SYSCLK:u32 = 480;
+    const LE_HCLK:u32 = LE_SYSCLK/2;
+    const LE_PCLK:u32 = LE_HCLK/2;
+    let rcc = dp.RCC
+        .constrain()
+        .use_hse(16.mhz()) // Durandal has 16 MHz xtal HSE
+        .sysclk(LE_SYSCLK.mhz())
+        .hclk(LE_HCLK.mhz())
+        .pll1_p_ck(480.mhz())
+        .pll1_q_ck(240.mhz())
+        .pll1_r_ck(120.mhz())
+        .pll1_strategy(PllConfigStrategy::Iterative)
+        .pclk1(LE_PCLK.mhz())
+        .pclk2(LE_PCLK.mhz())
+        .pclk3(LE_PCLK.mhz())
+        .pclk4(LE_PCLK.mhz());
+
+
+    //let rcc = dp.RCC.constrain();
 
     let pwr = dp.PWR.constrain();
     let vos = pwr.freeze();
+    //TODO vos is coming back as Scale1 but needs to be Scale0 to get 480 MHz ?
+    let vos = VoltageScale::Scale0; //force higher?
+    // For SPI1 need clock source of:  STM32_RCC_D2CCIP1R_SPI123SRC RCC_D2CCIP1R_SPI123SEL_PLL2
 
+    bkpt();
     //use the existing sysclk
     let mut ccdr = rcc.freeze(vos, &dp.SYSCFG);
     let clocks = ccdr.clocks;
@@ -139,15 +180,19 @@ fn setup_peripherals() ->  (
         dp.I2C4.i2c((scl, sda), 400.khz(), &ccdr)
     };
 
-
+    //bkpt();
     //setup SPI1 for the bulk of SPI-connected internal sensors
-    //TODO need a mutex for the shared SPI1 bus
     let spi1_port =  {
         let sck = gpiog.pg11.into_alternate_af5();
         let miso = gpioa.pa6.into_alternate_af5();
         let mosi = gpiod.pd7.into_alternate_af5();
         dp.SPI1.spi((sck, miso, mosi), ehal::spi::MODE_3, 2.mhz(), &ccdr)
     };
+    //PF2 is CS for TDK IMU ICM20689
+    // TODO setup at 2 MHz?
+    let mut spi1_cs_tdk = gpiof.pf2.into_push_pull_output();
+    //PB4 is DRDY for TDK IMU ICM20689
+    let mut spi1_drdy_tdk = gpiob.pb4.into_floating_input();
 
     let spi4_port =  {
         let sck = gpioe.pe2.into_alternate_af5();
@@ -160,8 +205,6 @@ fn setup_peripherals() ->  (
 
 
 
-
-    //TODO setup ICM20689 SPI SP1 CS pin PF2 at 2 MHz
     //TODO setup BMI088 GYRO SP1 CS pin PF4 at 2 MHz
     //TODO setup BMI088 GYRO SP1 CS pin PG10 at 2 MHz
 
@@ -179,7 +222,14 @@ fn setup_peripherals() ->  (
     };
 
 
-    (i2c3_port , i2c4_port, spi1_port, spi4_port, spi4_cs1,  uart7_port, user_led1, delay_source)
+    (i2c3_port ,
+     i2c4_port,
+     spi1_port,
+     (spi1_cs_tdk, spi1_drdy_tdk),
+     spi4_port, spi4_cs1,
+     uart7_port,
+     user_led1,
+     delay_source)
 }
 
 
@@ -190,6 +240,7 @@ fn main() -> ! {
     let (i2c3_port,
         i2c4_port,
         spi1_port,
+        (spi1_cs_tdk, spi1_drdy_tdk),
         spi4_port,
         spi4_cs1,
         uart7_port,
@@ -197,7 +248,7 @@ fn main() -> ! {
         mut delay_source) =
         setup_peripherals();
 
-
+    let spi_bus1 = shared_bus::CortexMBusManager::new(spi1_port);
     let spi_bus4 = shared_bus::CortexMBusManager::new(spi4_port);
     let i2c_bus3 = shared_bus::CortexMBusManager::new(i2c3_port);
     let i2c_bus4 = shared_bus::CortexMBusManager::new(i2c4_port);
@@ -205,8 +256,24 @@ fn main() -> ! {
     // wait a bit for sensors to power up
     delay_source.delay_ms(250u8);
 
+    // let iface = icm20689::SpiInterface::new(
+    //     spi_bus1.acquire(),
+    //     spi1_cs_tdk,
+    //     spi1_drdy_tdk);
 
-    //let mut tdk_6dof = icm20689::Builder::new_spi(spi_bus1.acquire(),tdk_6dof_cs, tdk_6dof_drdy);
+    //bkpt();
+    let mut tdk_6dof = icm20689::Builder::new_spi(
+        spi_bus1.acquire(),
+        spi1_cs_tdk,
+    );
+        // spi1_drdy_tdk);
+
+    bkpt();
+    let check = tdk_6dof.probe();
+    if !check {
+        panic!("probe failed");
+    }
+
     let mut format_buf = ArrayString::<[u8; 20]>::new();
     let mut disp: GraphicsMode<_> = ssd1306::Builder::new().connect_i2c(i2c_bus4.acquire()).into();
     disp.init().unwrap();
