@@ -29,6 +29,9 @@ ist8310 = { path = "../ist8310"}
 #icm20689 =  { git = "https://github.com/tstellanova/icm20689" }
 icm20689 = { path = "../icm20689"}
 
+#bmi088 =  { git = "https://github.com/tstellanova/bmi088" }
+bmi088 = { path = "../bmi088"}
+
 # stm32 family specialization:
 stm32h7 = { version = "0.10.0", features = ["stm32h743"] }
 #stm32h7xx-hal = { version = "0.4.0", features = ["stm32h743", "rt"] }

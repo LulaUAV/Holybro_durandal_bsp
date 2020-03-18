@@ -1,11 +1,8 @@
-
-
-
 #[macro_export]
 #[cfg(debug_assertions)]
 #[cfg(test)]
 macro_rules! debug_println {
-    ($s:expr, $($tt:tt)*) => ({ })
+    ($s:expr, $($tt:tt)*) => {{}};
 }
 
 #[macro_export]
@@ -21,5 +18,5 @@ macro_rules! debug_println {
 #[macro_export]
 #[cfg(not(debug_assertions))]
 macro_rules! debug_println {
-    ($s:expr, $($tt:tt)*) => ({  })
+    ($s:expr, $($tt:tt)*) => {{}};
 }

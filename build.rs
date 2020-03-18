@@ -13,5 +13,4 @@ fn main() {
         .write_all(memfile_bytes)
         .unwrap();
     println!("cargo:rustc-link-search={}", out.display());
-
 }
