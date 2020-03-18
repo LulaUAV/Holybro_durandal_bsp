@@ -13,8 +13,8 @@ extern crate panic_semihosting; // logs messages to the host stderr; requires a 
 use cortex_m_rt::{entry, ExceptionFrame};
 use stm32h7xx_hal as p_hal;
 
-#[macro_use]
-mod macros;
+// #[macro_use]
+// mod macros;
 
 use p_hal::{prelude::*, stm32};
 
@@ -30,7 +30,7 @@ use ssd1306::prelude::*;
 
 use arrayvec::ArrayString;
 use core::fmt;
-use core::fmt::Write;
+use core::fmt::{Write, Arguments};
 
 use p_hal::time::U32Ext;
 
@@ -52,6 +52,7 @@ use embedded_hal::digital::v2::InputPin;
 use p_hal::pwr::VoltageScale;
 use p_hal::rcc::PllConfigStrategy;
 use p_hal::serial::config::{Parity, StopBits, WordLength};
+use embedded_hal::serial;
 
 // cortex-m-rt is setup to call DefaultHandler for a number of fault conditions
 // // we can override this in debug mode for handy debugging
@@ -242,15 +243,15 @@ fn setup_peripherals() -> (
     )
 }
 
-// fn debug_println(po_tx: &DbgUartTxType, args: Arguments<'_>) {
-//     let mut format_buf = ArrayString::<[u8; 24]>::new();
-//     format_buf.clear();
-//     if fmt::write(&mut format_buf,args).is_ok() {
-//         let le_str = format_buf.as_str();
-//         //write on console out
-//         po_tx.write_str(le_str).unwrap();
-//     }
-// }
+fn local_println(po_tx: &mut impl Write, args: Arguments<'_>) {
+    let mut format_buf = ArrayString::<[u8; 24]>::new();
+    format_buf.clear();
+    if fmt::write(&mut format_buf,args).is_ok() {
+        let le_str = format_buf.as_str();
+        //write on console out
+        po_tx.write_str(le_str).unwrap();
+    }
+}
 
 #[entry]
 fn main() -> ! {
@@ -276,24 +277,8 @@ fn main() -> ! {
     delay_source.delay_ms(250u8);
 
     let (mut po_tx, mut _po_rx) = uart7_port.split();
+    local_println(&mut po_tx, format_args!("\r\n---BEGIN---\r\n"));
 
-    // // TODO troubleshoot icm20689 SPI reads -- probe is consistently failing
-    // let mut tdk_6dof = icm20689::Builder::new_spi(
-    //     spi_bus1.acquire(),
-    //     spi1_cs_tdk,
-    // );
-    //
-    // if !tdk_6dof.probe().unwrap() {
-    //     //probe failed
-    //     bkpt();
-    // }
-
-    //let mut bmi088_g = bmi088::Builder::new_gyro_spi(spi_bus1.acquire(),spi1_cs_bmi088_gyro);
-    let mut bmi088_a = bmi088::Builder::new_accel_spi(spi_bus1.acquire(), spi1_cs_bmi088_accel);
-    bkpt();
-    if !bmi088_a.probe().unwrap() {
-        //probe failed
-    }
 
     let mut format_buf = ArrayString::<[u8; 20]>::new();
     let mut disp: GraphicsMode<_> = ssd1306::Builder::new()
@@ -306,6 +291,35 @@ fn main() -> ! {
     let mut mag = IST8310::default(i2c_bus3.acquire()).unwrap();
 
     let mut msbaro = Ms5611::new(spi_bus4.acquire(), spi4_cs1, &mut delay_source).unwrap();
+
+    // TODO troubleshoot SPI1  reads -- probe is consistently failing
+    let mut spi1_success = true;
+    let mut tdk_6dof = icm20689::Builder::new_spi(spi_bus1.acquire(),spi1_cs_tdk);
+    if !tdk_6dof.probe().unwrap() {
+        spi1_success = false;
+        local_println(&mut po_tx, format_args!("icm20689 probe failed\r\n"));
+    }
+
+    let mut bmi088_a = bmi088::Builder::new_accel_spi(spi_bus1.acquire(), spi1_cs_bmi088_accel);
+    if !bmi088_a.probe().unwrap() {
+        spi1_success = false;
+        local_println(&mut po_tx, format_args!("bmi088_a probe failed\r\n"));
+    }
+
+    let mut bmi088_g = bmi088::Builder::new_gyro_spi(spi_bus1.acquire(),spi1_cs_bmi088_gyro);
+    if !bmi088_g.probe().unwrap() {
+        spi1_success = false;
+        local_println(&mut po_tx, format_args!("bmi088_g probe failed\r\n"));
+    }
+
+    if !bmi088_a.probe().unwrap() {
+        spi1_success = false;
+        local_println(&mut po_tx, format_args!("bmi088_a probe failed\r\n"));
+    }
+
+    if !spi1_success {
+        bkpt();
+    }
 
     let _ = user_led1.set_low();
     let mut loop_count = 0;
@@ -326,7 +340,7 @@ fn main() -> ! {
         if fmt::write(
             &mut format_buf,
             format_args!(
-                "{} {} {}        \r\n",
+                "{} {} {}   \r\n",
                 mag_sample[0], mag_sample[1], mag_sample[2]
             ),
         )

@@ -76,4 +76,4 @@ pub type Uart7PortType = p_hal::serial::Serial<
     ),
 >;
 
-// pub type DbgUartTxType = p_hal::serial::Tx<Uart7PortType>;
+pub type DbgUartTxType = p_hal::serial::Tx<Uart7PortType>;
