@@ -16,7 +16,7 @@ use stm32::UART7;
 
 pub type HalI2cError = p_hal::i2c::Error;
 pub type HalSpiError = p_hal::spi::Error;
-
+pub type HalGpioError = p_hal::Never;
 
 
 
@@ -69,3 +69,6 @@ pub type Uart7PortType = p_hal::serial::Serial<UART7,
     p_hal::gpio::gpiof::PF6<p_hal::gpio::Alternate<p_hal::gpio::AF7>>
     )
     >;
+
+
+// pub type DbgUartTxType = p_hal::serial::Tx<Uart7PortType>;

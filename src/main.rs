@@ -32,7 +32,7 @@ use embedded_graphics::prelude::*;
 
 
 use core::fmt;
-use core::fmt::Write;
+use core::fmt::{Write};
 use arrayvec::ArrayString;
 
 use p_hal::time::{U32Ext};
@@ -49,12 +49,12 @@ extern crate cortex_m_rt;
 #[allow(dead_code)]
 mod port_types;
 
-use crate::port_types::{Uart7PortType, HalI2cError, HalSpiError, Spi1PortType };
+use crate::port_types::{Uart7PortType, HalI2cError, HalSpiError, HalGpioError};
 use p_hal::serial::config::{WordLength, Parity, StopBits};
 use embedded_hal::digital::v2::InputPin;
 use cortex_m::asm::bkpt;
-use stm32h7xx_hal::rcc::PllConfigStrategy;
-use stm32h7xx_hal::pwr::VoltageScale;
+use p_hal::rcc::PllConfigStrategy;
+use p_hal::pwr::VoltageScale;
 
 
 // cortex-m-rt is setup to call DefaultHandler for a number of fault conditions
@@ -90,13 +90,20 @@ fn setup_peripherals() ->  (
     //Spi1PortType,
     impl ehal::blocking::spi::Transfer<u8, Error=HalSpiError> + ehal::blocking::spi::Write<u8, Error=HalSpiError>,
 
+    // SPI CS and DRDY pins for TDK IMU
     (
         //spi1_cs_tdk
-        impl OutputPin,
-
+        impl OutputPin<Error=HalGpioError>,
         //spi1_drdy_tdk
-        impl InputPin,
+        impl InputPin<Error=HalGpioError>,
     ),
+
+    // SPI pins for BMI088
+    (
+        impl OutputPin<Error=HalGpioError>, // BMI088 gyro
+        impl OutputPin<Error=HalGpioError>, // BMI088 accel
+    ),
+
     // spi4
     //Spi4PortType,
     impl ehal::blocking::spi::Transfer<u8, Error=HalSpiError> + ehal::blocking::spi::Write<u8, Error=HalSpiError>,
@@ -140,16 +147,13 @@ fn setup_peripherals() ->  (
         .pclk4(LE_PCLK.mhz());
 
 
-    //let rcc = dp.RCC.constrain();
-
     let pwr = dp.PWR.constrain();
     let vos = pwr.freeze();
-    //TODO vos is coming back as Scale1 but needs to be Scale0 to get 480 MHz ?
-    let vos = VoltageScale::Scale0; //force higher?
-    // For SPI1 need clock source of:  STM32_RCC_D2CCIP1R_SPI123SRC RCC_D2CCIP1R_SPI123SEL_PLL2
+    //TODO vos is coming back as Scale1 but needs to be Scale0 to boost to 480 MHz ?
+    let vos = VoltageScale::Scale0; //may force higher? or just allow asserts to pass?
+    //TODO need to write         self.rb.d3cr.write(|w| unsafe { w.vos().bits(0b11) });
+    // see "VOS0 activation/deactivation sequence" in RM0433
 
-    bkpt();
-    //use the existing sysclk
     let mut ccdr = rcc.freeze(vos, &dp.SYSCFG);
     let clocks = ccdr.clocks;
 
@@ -180,19 +184,28 @@ fn setup_peripherals() ->  (
         dp.I2C4.i2c((scl, sda), 400.khz(), &ccdr)
     };
 
-    //bkpt();
     //setup SPI1 for the bulk of SPI-connected internal sensors
+    // TODO need to increase SPI1 clock speed?
     let spi1_port =  {
         let sck = gpiog.pg11.into_alternate_af5();
         let miso = gpioa.pa6.into_alternate_af5();
         let mosi = gpiod.pd7.into_alternate_af5();
         dp.SPI1.spi((sck, miso, mosi), ehal::spi::MODE_3, 2.mhz(), &ccdr)
     };
-    //PF2 is CS for TDK IMU ICM20689
-    // TODO setup at 2 MHz?
-    let mut spi1_cs_tdk = gpiof.pf2.into_push_pull_output();
-    //PB4 is DRDY for TDK IMU ICM20689
-    let mut spi1_drdy_tdk = gpiob.pb4.into_floating_input();
+    //PF2 is CS for TDK ICM20689 (2 MHz - 8 MHz)
+    let mut spi1_cs_tdk = gpiof.pf2.into_push_pull_output().set_speed(p_hal::gpio::Speed::Low);
+    spi1_cs_tdk.set_high().unwrap();
+
+    //PB4 is DRDY for TDK ICM20689
+    let spi1_drdy_tdk = gpiob.pb4.into_floating_input();
+
+    // PF4 is SPI1 CS4 BMI088 gyro
+    let mut spi1_cs_bmi088_gyro = gpiof.pf4.into_push_pull_output();
+    spi1_cs_bmi088_gyro.set_high().unwrap();
+
+    // PG10 is SPI1 CS4 BMI088 accel
+    let mut spi1_cs_bmi088_accel = gpiog.pg10.into_push_pull_output();
+    spi1_cs_bmi088_accel.set_high().unwrap();
 
     let spi4_port =  {
         let sck = gpioe.pe2.into_alternate_af5();
@@ -203,10 +216,6 @@ fn setup_peripherals() ->  (
     let mut spi4_cs1 = gpiof.pf10.into_push_pull_output();
     spi4_cs1.set_high().unwrap();
 
-
-
-    //TODO setup BMI088 GYRO SP1 CS pin PF4 at 2 MHz
-    //TODO setup BMI088 GYRO SP1 CS pin PG10 at 2 MHz
 
     //UART7 is debug (dronecode port): `(PF6, PE8)`
     let uart7_port = {
@@ -226,6 +235,7 @@ fn setup_peripherals() ->  (
      i2c4_port,
      spi1_port,
      (spi1_cs_tdk, spi1_drdy_tdk),
+     (spi1_cs_bmi088_gyro, spi1_cs_bmi088_accel),
      spi4_port, spi4_cs1,
      uart7_port,
      user_led1,
@@ -233,6 +243,15 @@ fn setup_peripherals() ->  (
 }
 
 
+// fn debug_println(po_tx: &DbgUartTxType, args: Arguments<'_>) {
+//     let mut format_buf = ArrayString::<[u8; 24]>::new();
+//     format_buf.clear();
+//     if fmt::write(&mut format_buf,args).is_ok() {
+//         let le_str = format_buf.as_str();
+//         //write on console out
+//         po_tx.write_str(le_str).unwrap();
+//     }
+// }
 
 #[entry]
 fn main() -> ! {
@@ -241,6 +260,7 @@ fn main() -> ! {
         i2c4_port,
         spi1_port,
         (spi1_cs_tdk, spi1_drdy_tdk),
+         (spi1_cs_bmi088_gyro, spi1_cs_bmi088_accel),
         spi4_port,
         spi4_cs1,
         uart7_port,
@@ -256,23 +276,19 @@ fn main() -> ! {
     // wait a bit for sensors to power up
     delay_source.delay_ms(250u8);
 
-    // let iface = icm20689::SpiInterface::new(
+
+    let (mut po_tx, mut _po_rx) = uart7_port.split();
+
+    // // TODO troubleshoot icm20689 SPI reads -- probe is consistently failing
+    // let mut tdk_6dof = icm20689::Builder::new_spi(
     //     spi_bus1.acquire(),
     //     spi1_cs_tdk,
-    //     spi1_drdy_tdk);
-
-    //bkpt();
-    let mut tdk_6dof = icm20689::Builder::new_spi(
-        spi_bus1.acquire(),
-        spi1_cs_tdk,
-    );
-        // spi1_drdy_tdk);
-
-    bkpt();
-    let check = tdk_6dof.probe();
-    if !check {
-        panic!("probe failed");
-    }
+    // );
+    //
+    // if !tdk_6dof.probe().unwrap() {
+    //     //probe failed
+    //     bkpt();
+    // }
 
     let mut format_buf = ArrayString::<[u8; 20]>::new();
     let mut disp: GraphicsMode<_> = ssd1306::Builder::new().connect_i2c(i2c_bus4.acquire()).into();
@@ -286,12 +302,8 @@ fn main() -> ! {
                                  spi4_cs1,
                                  &mut delay_source).unwrap();
 
-    let (mut po_tx, mut _po_rx) = uart7_port.split();
 
     let _ = user_led1.set_low();
-
-
-
     let mut loop_count = 0;
     loop {
         let mag_sample = mag.get_mag_vector(&mut delay_source).unwrap();
@@ -308,8 +320,9 @@ fn main() -> ! {
 
         format_buf.clear();
         if fmt::write(&mut format_buf,
-                      format_args!("{} {} {} \r\n", mag_sample[0],mag_sample[1],mag_sample[2]))
+                      format_args!("{} {} {}        \r\n", mag_sample[0],mag_sample[1],mag_sample[2]))
             .is_ok() {
+
             let le_str = format_buf.as_str();
             //write on console out
             po_tx.write_str(le_str).unwrap();
