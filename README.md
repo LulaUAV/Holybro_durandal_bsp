@@ -28,13 +28,14 @@ This is very much work-in-progress
 - [x] Debug serial console output (on dronecode connector serial port `UART7`)
 - [x] Access internal `I2C3` bus
 - [x] IST8310 internal magnetometer reading (use new ist8310 crate)
-- [ ] All internal SPI bus access
+- [x] initial clock configuration to match max Durandal specs
+- [x] All internal SPI bus access (`SPI1`, `SPI4`)
+- [ ] ICM20689 internal 6DOF reading (creating ehal driver)
+- [ ] BMI088 internal 6DOF reading internal SPI (creating ehal driver)
 - [ ] External SPI bus access
 - [ ] Internal I2C bus access
 - [ ] External "I2C B" bus access (`I2C2`)
 - [ ] Telem 1, 2, 3, 4 serial port access (uart)
-- [ ] ICM20689 internal 6DOF reading (no existing ehal driver)
-- [ ] BMI088 internal 6DOF reading internal SPI (no existing ehal driver)
 - [ ] SDMMC read/write
 - [ ] Running on RTOS
 - [ ] USB-C serial I/O
@@ -48,7 +49,7 @@ This is very much work-in-progress
 - [ ] Semihosting debug support via dronecode debug port
 - [ ] CI
 - [ ] Documentation
-- [ ] IST8310 external i2c mag (no existing ehal driver?)
+- [ ] IST8310 external i2c mag (use ist8310 crate)
 - [ ] hmc5883 external mag (no existing ehal driver?)
 - [ ] qmc5883 external mag (no existing ehal driver?)
 - [ ] LIS3MDL external mag (no existing ehal driver? see LSM303c?)
