@@ -49,7 +49,7 @@ mod port_types;
 use crate::port_types::{HalGpioError, HalI2cError, HalSpiError, Uart7PortType};
 use cortex_m::asm::bkpt;
 use embedded_hal::digital::v2::InputPin;
-use embedded_hal::serial;
+// use embedded_hal::serial;
 use p_hal::pwr::VoltageScale;
 use p_hal::rcc::PllConfigStrategy;
 use p_hal::serial::config::{Parity, StopBits, WordLength};
@@ -70,7 +70,7 @@ fn HardFault(ef: &ExceptionFrame) -> ! {
 
 // const LABEL_TEXT_HEIGHT: i32 = 5;
 // const SCREEN_WIDTH: i32 = 128;
-const SCREEN_HEIGHT: i32 = 32;
+// const SCREEN_HEIGHT: i32 = 32;
 
 fn setup_peripherals() -> (
     // i2c3
@@ -143,11 +143,12 @@ fn setup_peripherals() -> (
         .pclk4(LE_PCLK.mhz());
 
     let pwr = dp.PWR.constrain();
-    let vos = pwr.freeze();
-    //TODO vos is coming back as Scale1 but needs to be Scale0 to boost to 480 MHz ?
+    let _vos = pwr.freeze();
+    //TODO vos defaults to Scale1 but needs to upgrade to Scale0 to boost to 480 MHz
     let vos = VoltageScale::Scale0; //may force higher? or just allow asserts to pass?
-                                    //TODO need to write         self.rb.d3cr.write(|w| unsafe { w.vos().bits(0b11) });
-                                    // see "VOS0 activation/deactivation sequence" in RM0433
+
+    //TODO need to write : self.rb.d3cr.write(|w| unsafe { w.vos().bits(0b11) });
+    // see "VOS0 activation/deactivation sequence" in RM0433
 
     let mut ccdr = rcc.freeze(vos, &dp.SYSCFG);
     let clocks = ccdr.clocks;
@@ -259,7 +260,7 @@ fn main() -> ! {
         i2c3_port,
         i2c4_port,
         spi1_port,
-        (spi1_cs_tdk, spi1_drdy_tdk),
+        (spi1_cs_tdk, _spi1_drdy_tdk),
         (spi1_cs_bmi088_gyro, spi1_cs_bmi088_accel),
         spi4_port,
         spi4_cs1,
@@ -293,27 +294,23 @@ fn main() -> ! {
 
     // TODO troubleshoot SPI1  reads -- probe is consistently failing
     let mut spi1_success = true;
-    let mut tdk_6dof = icm20689::Builder::new_spi(spi_bus1.acquire(), spi1_cs_tdk);
-    if !tdk_6dof.probe().unwrap() {
-        spi1_success = false;
-        local_println(&mut po_tx, format_args!("icm20689 probe failed\r\n"));
-    }
 
     let mut bmi088_a = bmi088::Builder::new_accel_spi(spi_bus1.acquire(), spi1_cs_bmi088_accel);
-    if !bmi088_a.probe().unwrap() {
+    if bmi088_a.setup(&mut delay_source).is_err() {
         spi1_success = false;
-        local_println(&mut po_tx, format_args!("bmi088_a probe failed\r\n"));
+        local_println(&mut po_tx, format_args!("bmi088_a failed\r\n"));
     }
 
     let mut bmi088_g = bmi088::Builder::new_gyro_spi(spi_bus1.acquire(), spi1_cs_bmi088_gyro);
-    if !bmi088_g.probe().unwrap() {
+    if bmi088_g.setup(&mut delay_source).is_err() {
         spi1_success = false;
-        local_println(&mut po_tx, format_args!("bmi088_g probe failed\r\n"));
+        local_println(&mut po_tx, format_args!("bmi088_g failed\r\n"));
     }
 
-    if !bmi088_a.probe().unwrap() {
+    let mut tdk_6dof = icm20689::Builder::new_spi(spi_bus1.acquire(), spi1_cs_tdk);
+    if tdk_6dof.setup(&mut delay_source).is_err() {
         spi1_success = false;
-        local_println(&mut po_tx, format_args!("bmi088_a probe failed\r\n"));
+        local_println(&mut po_tx, format_args!("icm20689 failed\r\n"));
     }
 
     if !spi1_success {
@@ -321,16 +318,16 @@ fn main() -> ! {
     }
 
     let _ = user_led1.set_low();
-    let mut last_accel: [i16; 3] = [0; 3];
-    let mut last_gyro: [i16; 3] = [0; 3];
+    let mut last_accel: [i16; 3];
+    let mut last_gyro: [i16; 3];
     let mut last_mag: [i16; 3] = [0; 3];
-    let mut last_press = 0;
+    let mut last_press;
     loop {
-        if let Ok(gyro_sample) = tdk_6dof.get_accel() {
+        if let Ok(gyro_sample) = bmi088_g.get_gyro() {
             last_gyro = gyro_sample;
             local_println(&mut po_tx, format_args!("gyro: {:?}\r\n", last_gyro));
         }
-        if let Ok(accel_sample) = tdk_6dof.get_accel() {
+        if let Ok(accel_sample) = bmi088_a.get_accel() {
             last_accel = accel_sample;
             local_println(&mut po_tx, format_args!("accel: {:?}\r\n", last_accel));
         }
@@ -342,13 +339,13 @@ fn main() -> ! {
             msbaro.get_second_order_sample(Oversampling::OS_2048, &mut delay_source)
         {
             last_press = press_sample.pressure;
-            local_println(&mut po_tx, format_args!("press: {}", last_press));
+            local_println(&mut po_tx, format_args!("press: {}\r\n", last_press));
         }
 
         format_buf.clear();
         if fmt::write(
             &mut format_buf,
-            format_args!("{} {} {}", last_accel[0], last_accel[1], last_accel[2]),
+            format_args!("{} {} {}", last_mag[0], last_mag[1], last_mag[2]),
         )
         .is_ok()
         {

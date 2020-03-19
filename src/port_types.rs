@@ -1,6 +1,6 @@
-use embedded_hal as hal;
+// use embedded_hal as hal;
 
-use hal::digital::v2::{InputPin, OutputPin};
+// use hal::digital::v2::{InputPin, OutputPin};
 use p_hal::stm32;
 use stm32h7xx_hal as p_hal;
 
