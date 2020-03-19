@@ -321,37 +321,38 @@ fn main() -> ! {
     }
 
     let _ = user_led1.set_low();
-    let mut loop_count = 0;
+    let mut last_accel: [i16; 3] = [0; 3];
+    let mut last_gyro: [i16; 3] = [0; 3];
+    let mut last_mag: [i16; 3] = [0; 3];
+    let mut last_press = 0;
     loop {
-        let gyro_sample = tdk_6dof.get_accel().unwrap();
-        let accel_sample = tdk_6dof.get_accel().unwrap();
-
-        let mag_sample = mag.get_mag_vector(&mut delay_source).unwrap();
-
-        let ms_sample = msbaro.get_second_order_sample(Oversampling::OS_2048, &mut delay_source);
-        let ms_press = if ms_sample.is_ok() {
-            ms_sample.unwrap().pressure
-        } else {
-            0
-        };
-
-        //let bmp_press = 10.0 * barometer.pressure_one_shot();
-        //debug_println!("press: {:.2}", ms_press);
+        if let Ok(gyro_sample) = tdk_6dof.get_accel() {
+            last_gyro = gyro_sample;
+            local_println(&mut po_tx, format_args!("gyro: {:?}\r\n", last_gyro));
+        }
+        if let Ok(accel_sample) = tdk_6dof.get_accel() {
+            last_accel = accel_sample;
+            local_println(&mut po_tx, format_args!("accel: {:?}\r\n", last_accel));
+        }
+        if let Ok(mag_sample) = mag.get_mag_vector(&mut delay_source) {
+            last_mag = mag_sample;
+            local_println(&mut po_tx, format_args!("mag: {:?}\r\n", last_mag));
+        }
+        if let Ok(press_sample) =
+            msbaro.get_second_order_sample(Oversampling::OS_2048, &mut delay_source)
+        {
+            last_press = press_sample.pressure;
+            local_println(&mut po_tx, format_args!("press: {}", last_press));
+        }
 
         format_buf.clear();
         if fmt::write(
             &mut format_buf,
-            format_args!(
-                "{} {} {}   \r\n",
-                mag_sample[0], mag_sample[1], mag_sample[2]
-            ),
+            format_args!("{} {} {}", last_accel[0], last_accel[1], last_accel[2]),
         )
         .is_ok()
         {
             let le_str = format_buf.as_str();
-            //write on console out
-            po_tx.write_str(le_str).unwrap();
-
             // draw on the oled display
             disp.draw(
                 Font6x8::render_str(le_str)
@@ -364,6 +365,5 @@ fn main() -> ! {
 
         let _ = user_led1.toggle();
         delay_source.delay_ms(1u8);
-        loop_count += 1;
     }
 }
