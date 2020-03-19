@@ -30,7 +30,7 @@ use ssd1306::prelude::*;
 
 use arrayvec::ArrayString;
 use core::fmt;
-use core::fmt::{Write, Arguments};
+use core::fmt::{Arguments, Write};
 
 use p_hal::time::U32Ext;
 
@@ -49,10 +49,10 @@ mod port_types;
 use crate::port_types::{HalGpioError, HalI2cError, HalSpiError, Uart7PortType};
 use cortex_m::asm::bkpt;
 use embedded_hal::digital::v2::InputPin;
+use embedded_hal::serial;
 use p_hal::pwr::VoltageScale;
 use p_hal::rcc::PllConfigStrategy;
 use p_hal::serial::config::{Parity, StopBits, WordLength};
-use embedded_hal::serial;
 
 // cortex-m-rt is setup to call DefaultHandler for a number of fault conditions
 // // we can override this in debug mode for handy debugging
@@ -246,7 +246,7 @@ fn setup_peripherals() -> (
 fn local_println(po_tx: &mut impl Write, args: Arguments<'_>) {
     let mut format_buf = ArrayString::<[u8; 24]>::new();
     format_buf.clear();
-    if fmt::write(&mut format_buf,args).is_ok() {
+    if fmt::write(&mut format_buf, args).is_ok() {
         let le_str = format_buf.as_str();
         //write on console out
         po_tx.write_str(le_str).unwrap();
@@ -279,7 +279,6 @@ fn main() -> ! {
     let (mut po_tx, mut _po_rx) = uart7_port.split();
     local_println(&mut po_tx, format_args!("\r\n---BEGIN---\r\n"));
 
-
     let mut format_buf = ArrayString::<[u8; 20]>::new();
     let mut disp: GraphicsMode<_> = ssd1306::Builder::new()
         .connect_i2c(i2c_bus4.acquire())
@@ -294,7 +293,7 @@ fn main() -> ! {
 
     // TODO troubleshoot SPI1  reads -- probe is consistently failing
     let mut spi1_success = true;
-    let mut tdk_6dof = icm20689::Builder::new_spi(spi_bus1.acquire(),spi1_cs_tdk);
+    let mut tdk_6dof = icm20689::Builder::new_spi(spi_bus1.acquire(), spi1_cs_tdk);
     if !tdk_6dof.probe().unwrap() {
         spi1_success = false;
         local_println(&mut po_tx, format_args!("icm20689 probe failed\r\n"));
@@ -306,7 +305,7 @@ fn main() -> ! {
         local_println(&mut po_tx, format_args!("bmi088_a probe failed\r\n"));
     }
 
-    let mut bmi088_g = bmi088::Builder::new_gyro_spi(spi_bus1.acquire(),spi1_cs_bmi088_gyro);
+    let mut bmi088_g = bmi088::Builder::new_gyro_spi(spi_bus1.acquire(), spi1_cs_bmi088_gyro);
     if !bmi088_g.probe().unwrap() {
         spi1_success = false;
         local_println(&mut po_tx, format_args!("bmi088_g probe failed\r\n"));
@@ -324,6 +323,9 @@ fn main() -> ! {
     let _ = user_led1.set_low();
     let mut loop_count = 0;
     loop {
+        let gyro_sample = tdk_6dof.get_accel().unwrap();
+        let accel_sample = tdk_6dof.get_accel().unwrap();
+
         let mag_sample = mag.get_mag_vector(&mut delay_source).unwrap();
 
         let ms_sample = msbaro.get_second_order_sample(Oversampling::OS_2048, &mut delay_source);
