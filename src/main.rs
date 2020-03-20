@@ -34,11 +34,10 @@ use core::fmt::{Arguments, Write};
 
 use p_hal::time::U32Ext;
 
-use ist8310::IST8310;
-use ms5611::{Ms5611, Oversampling};
 /// Sensors
+use ist8310::IST8310;
 use ms5611_spi as ms5611;
-// use icm20689::{ICM20689};
+use ms5611::{Ms5611, Oversampling};
 
 #[macro_use]
 extern crate cortex_m_rt;
@@ -53,6 +52,8 @@ use embedded_hal::digital::v2::InputPin;
 use p_hal::pwr::VoltageScale;
 use p_hal::rcc::PllConfigStrategy;
 use p_hal::serial::config::{Parity, StopBits, WordLength};
+use ssd1306::interface::DisplayInterface;
+
 
 // cortex-m-rt is setup to call DefaultHandler for a number of fault conditions
 // // we can override this in debug mode for handy debugging
@@ -68,9 +69,7 @@ fn HardFault(ef: &ExceptionFrame) -> ! {
     panic!("{:#?}", ef);
 }
 
-// const LABEL_TEXT_HEIGHT: i32 = 5;
-// const SCREEN_WIDTH: i32 = 128;
-// const SCREEN_HEIGHT: i32 = 32;
+
 
 fn setup_peripherals() -> (
     // i2c3
@@ -254,6 +253,33 @@ fn local_println(po_tx: &mut impl Write, args: Arguments<'_>) {
     }
 }
 
+fn oled_print<DI: DisplayInterface>(disp: &mut GraphicsMode<DI>, y_pos: i32, args: Arguments<'_>) {
+    let mut format_buf = ArrayString::<[u8; 16]>::new();
+    format_buf.clear();
+    if fmt::write(&mut format_buf, args).is_ok() {
+        let le_str = format_buf.as_str();
+        disp.draw(
+            Font6x8::render_str(le_str)
+                .with_stroke(Some(1u8.into()))
+                .translate(Coord::new(20, y_pos))
+                .into_iter(),
+        );
+        let _ = disp.flush();
+    }
+}
+
+/// Render formatted text to an external oled screen
+fn render_vec3<DI: DisplayInterface>(disp: &mut GraphicsMode<DI>, start_y: i32, _label: &str, buf: &[i16]) {
+    const LINE_HEIGHT: i32 = 10;
+    let mut y_pos = start_y;
+    //TODO dynamically reformat depending on display size
+    // oled_print(disp, y_pos, format_args!("{}", label)); y_pos += LINE_HEIGHT;
+    oled_print(disp, y_pos, format_args!("X: {}", buf[0] )); y_pos += LINE_HEIGHT;
+    oled_print(disp, y_pos, format_args!("Y: {}", buf[1] )); y_pos += LINE_HEIGHT;
+    oled_print(disp, y_pos, format_args!("Z: {}", buf[2] ));
+}
+
+
 #[entry]
 fn main() -> ! {
     let (
@@ -280,8 +306,8 @@ fn main() -> ! {
     let (mut po_tx, mut _po_rx) = uart7_port.split();
     local_println(&mut po_tx, format_args!("\r\n---BEGIN---\r\n"));
 
-    let mut format_buf = ArrayString::<[u8; 20]>::new();
     let mut disp: GraphicsMode<_> = ssd1306::Builder::new()
+        .with_size(DisplaySize::Display128x32)
         .connect_i2c(i2c_bus4.acquire())
         .into();
     disp.init().unwrap();
@@ -314,23 +340,32 @@ fn main() -> ! {
     }
 
     if !spi1_success {
+        local_println(&mut po_tx, format_args!("--- SPI1 FAIL --- \r\n"));
         bkpt();
     }
 
     let _ = user_led1.set_low();
-    let mut last_accel: [i16; 3];
-    let mut last_gyro: [i16; 3];
+    let mut last_accel: [i16; 3] = [0; 3];
+    let mut last_gyro: [i16; 3] = [0; 3];
     let mut last_mag: [i16; 3] = [0; 3];
     let mut last_press;
     loop {
-        if let Ok(gyro_sample) = bmi088_g.get_gyro() {
+        if let Ok(gyro_sample) = tdk_6dof.get_gyro() {
             last_gyro = gyro_sample;
-            local_println(&mut po_tx, format_args!("gyro: {:?}\r\n", last_gyro));
+            local_println(&mut po_tx, format_args!("gyro_i: {:?}\r\n", last_gyro));
         }
-        if let Ok(accel_sample) = bmi088_a.get_accel() {
+        if let Ok(accel_sample) = tdk_6dof.get_accel() {
             last_accel = accel_sample;
-            local_println(&mut po_tx, format_args!("accel: {:?}\r\n", last_accel));
+            local_println(&mut po_tx, format_args!("accel_i: {:?}\r\n", last_accel));
         }
+        // if let Ok(gyro_sample) = bmi088_g.get_gyro() {
+        //     last_gyro = gyro_sample;
+        //     local_println(&mut po_tx, format_args!("bmi088_g: {:?}\r\n", last_gyro));
+        // }
+        // if let Ok(accel_sample) = bmi088_a.get_accel() {
+        //     last_accel = accel_sample;
+        //     local_println(&mut po_tx, format_args!("bmi088_a: {:?}\r\n", last_accel));
+        // }
         if let Ok(mag_sample) = mag.get_mag_vector(&mut delay_source) {
             last_mag = mag_sample;
             local_println(&mut po_tx, format_args!("mag: {:?}\r\n", last_mag));
@@ -341,24 +376,8 @@ fn main() -> ! {
             last_press = press_sample.pressure;
             local_println(&mut po_tx, format_args!("press: {}\r\n", last_press));
         }
+        render_vec3(&mut disp, 2, "accel" , &last_accel);
 
-        format_buf.clear();
-        if fmt::write(
-            &mut format_buf,
-            format_args!("{} {} {}", last_mag[0], last_mag[1], last_mag[2]),
-        )
-        .is_ok()
-        {
-            let le_str = format_buf.as_str();
-            // draw on the oled display
-            disp.draw(
-                Font6x8::render_str(le_str)
-                    .with_stroke(Some(1u8.into()))
-                    .translate(Coord::new(20, 8))
-                    .into_iter(),
-            );
-            disp.flush().unwrap();
-        }
 
         let _ = user_led1.toggle();
         delay_source.delay_ms(1u8);

@@ -9,6 +9,7 @@ use stm32::I2C1;
 use stm32::I2C3;
 use stm32::I2C4;
 
+
 use stm32::SPI1;
 use stm32::SPI4;
 use stm32::UART7;
@@ -17,6 +18,8 @@ use stm32::UART7;
 pub type HalI2cError = p_hal::i2c::Error;
 pub type HalSpiError = p_hal::spi::Error;
 pub type HalGpioError = p_hal::Never;
+
+
 
 // type SharedBusType<T> = BusManager<shared_bus::BusMutex<cell::RefCell<T>>, T>;
 
