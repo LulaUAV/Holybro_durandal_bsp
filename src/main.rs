@@ -346,22 +346,23 @@ fn main() -> ! {
     let mut last_mag: [i16; 3] = [0; 3];
     let mut last_press;
     loop {
-        if let Ok(gyro_sample) = tdk_6dof.get_gyro() {
-            last_gyro = gyro_sample;
-            local_println(&mut po_tx, format_args!("gyro_i: {:?}\r\n", last_gyro));
-        }
-        if let Ok(accel_sample) = tdk_6dof.get_accel() {
-            last_accel = accel_sample;
-            local_println(&mut po_tx, format_args!("accel_i: {:?}\r\n", last_accel));
-        }
-        // if let Ok(gyro_sample) = bmi088_g.get_gyro() {
+        // if let Ok(gyro_sample) = tdk_6dof.get_gyro() {
         //     last_gyro = gyro_sample;
-        //     local_println(&mut po_tx, format_args!("bmi088_g: {:?}\r\n", last_gyro));
+        //     local_println(&mut po_tx, format_args!("gyro_i: {:?}\r\n", last_gyro));
         // }
-        // if let Ok(accel_sample) = bmi088_a.get_accel() {
+        // if let Ok(accel_sample) = tdk_6dof.get_accel() {
         //     last_accel = accel_sample;
-        //     local_println(&mut po_tx, format_args!("bmi088_a: {:?}\r\n", last_accel));
+        //     local_println(&mut po_tx, format_args!("accel_i: {:?}\r\n", last_accel));
         // }
+        if let Ok(gyro_sample) = bmi088_g.get_gyro() {
+            last_gyro = gyro_sample;
+            local_println(&mut po_tx, format_args!("gyro: {:?}\r\n", last_gyro));
+        }
+        if let Ok(accel_sample) = bmi088_a.get_accel() {
+            last_accel = accel_sample;
+            local_println(&mut po_tx, format_args!("accel: {:?}\r\n", last_accel));
+            render_vec3(&mut disp, 2, "accel" , &last_accel);
+        }
         if let Ok(mag_sample) = mag.get_mag_vector(&mut delay_source) {
             last_mag = mag_sample;
             local_println(&mut po_tx, format_args!("mag: {:?}\r\n", last_mag));
@@ -372,8 +373,6 @@ fn main() -> ! {
             last_press = press_sample.pressure;
             local_println(&mut po_tx, format_args!("press: {}\r\n", last_press));
         }
-        render_vec3(&mut disp, 2, "accel" , &last_accel);
-
 
         let _ = user_led1.toggle();
         delay_source.delay_ms(1u8);

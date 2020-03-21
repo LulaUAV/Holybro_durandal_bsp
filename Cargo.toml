@@ -12,25 +12,25 @@ cortex-m-rt = "0.6.10"
 cortex-m-semihosting = "0.3.3"
 panic-halt = "0.2.0"
 panic-semihosting = "0.5.3"
-cortex-m-log = { version = "0.6.1", features = ["log-integration", "itm", "semihosting"] }
-rand_core = "0.5.1"
-
 shared-bus = {version = "0.1.4", features = ["cortexm"] }
+
+# embedded graphics support:
 ssd1306 = "0.2.6"
 embedded-graphics = "0.4.9"
 arrayvec = {version = "0.5.1", default-features = false}
 
+# sensors
 ms5611-spi =  { git = "https://github.com/tstellanova/ms5611-ehal" }
 #ms5611-spi = { path = "../ms5611-ehal" }
 
-#ist8310 =  { git = "https://github.com/tstellanova/ist8310" }
-ist8310 = { path = "../ist8310"}
+ist8310 =  { git = "https://github.com/tstellanova/ist8310" }
+#ist8310 = { path = "../ist8310"}
 
-#icm20689 =  { git = "https://github.com/tstellanova/icm20689" }
-icm20689 = { path = "../icm20689"}
+icm20689 =  { git = "https://github.com/tstellanova/icm20689" }
+#icm20689 = { path = "../icm20689"}
 
-#bmi088 =  { git = "https://github.com/tstellanova/bmi088" }
-bmi088 = { path = "../bmi088"}
+bmi088 =  { git = "https://github.com/tstellanova/bmi088" }
+#bmi088 = { path = "../bmi088"}
 
 # stm32 family specialization:
 stm32h7 = { version = "0.10.0", features = ["stm32h743"] }
