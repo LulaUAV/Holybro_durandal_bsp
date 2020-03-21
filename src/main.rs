@@ -96,6 +96,11 @@ fn setup_peripherals() -> (
         impl OutputPin<Error = HalGpioError>, // BMI088 gyro CS
         impl OutputPin<Error = HalGpioError>, // BMI088 accel CS
     ),
+    // spi2 : Spi2PortType,
+    impl ehal::blocking::spi::Transfer<u8, Error = HalSpiError>
+    + ehal::blocking::spi::Write<u8, Error = HalSpiError>,
+    // spi2_cs1
+    impl OutputPin<Error = HalGpioError>,
     // spi4 : Spi4PortType,
     impl ehal::blocking::spi::Transfer<u8, Error = HalSpiError>
         + ehal::blocking::spi::Write<u8, Error = HalSpiError>,
@@ -159,6 +164,7 @@ fn setup_peripherals() -> (
     let gpiof = dp.GPIOF.split(&mut ccdr.ahb4);
     let gpiog = dp.GPIOG.split(&mut ccdr.ahb4);
     let gpioh = dp.GPIOH.split(&mut ccdr.ahb4);
+    let gpioi = dp.GPIOI.split(&mut ccdr.ahb4);
 
     let user_led1 = gpiob.pb1.into_push_pull_output(); // FMU "B/E" light on durandal
 
@@ -189,7 +195,7 @@ fn setup_peripherals() -> (
     let mut spi1_cs_tdk = gpiof
         .pf2
         .into_push_pull_output();
-        //.set_speed(p_hal::gpio::Speed::Low); //TODO verify
+        //.set_speed(p_hal::gpio::Speed::Low); //TODO should be 2 MHz
     spi1_cs_tdk.set_high().unwrap();
 
     //PB4 is DRDY for TDK ICM20689
@@ -202,6 +208,17 @@ fn setup_peripherals() -> (
     // PG10 is SPI1 CS4 BMI088 accel
     let mut spi1_cs_bmi088_accel = gpiog.pg10.into_push_pull_output();
     spi1_cs_bmi088_accel.set_high().unwrap();
+
+    // setup SPI2 for serial flash ram (FRAM)
+    let spi2_port = {
+        let sck = gpioi.pi1.into_alternate_af5();
+        let miso = gpioi.pi2.into_alternate_af5();
+        let mosi = gpioi.pi3.into_alternate_af5();
+        dp.SPI2.spi((sck, miso, mosi), ehal::spi::MODE_3, 10.mhz(), &ccdr)
+    };
+    // PF5 is SPI2 CS1 for FRAM
+    let mut spi2_cs1 = gpiof.pf5.into_push_pull_output();
+    spi2_cs1.set_high().unwrap();
 
     let spi4_port = {
         let sck = gpioe.pe2.into_alternate_af5();
@@ -231,6 +248,8 @@ fn setup_peripherals() -> (
         spi1_port,
         spi1_cs_tdk,
         (spi1_cs_bmi088_gyro, spi1_cs_bmi088_accel),
+        spi2_port,
+        spi2_cs1,
         spi4_port,
         spi4_cs1,
         uart7_port,
@@ -284,6 +303,8 @@ fn main() -> ! {
         spi1_port,
         spi1_cs_tdk,
         (spi1_cs_bmi088_gyro, spi1_cs_bmi088_accel),
+        spi2_port,
+        spi2_cs1,
         spi4_port,
         spi4_cs1,
         uart7_port,
@@ -292,7 +313,6 @@ fn main() -> ! {
     ) = setup_peripherals();
 
     let spi_bus1 = shared_bus::CortexMBusManager::new(spi1_port);
-    let spi_bus4 = shared_bus::CortexMBusManager::new(spi4_port);
     let i2c_bus3 = shared_bus::CortexMBusManager::new(i2c3_port);
     let i2c_bus4 = shared_bus::CortexMBusManager::new(i2c4_port);
 
@@ -311,8 +331,12 @@ fn main() -> ! {
     disp.flush().unwrap();
 
     let mut mag = IST8310::default(i2c_bus3.acquire()).unwrap();
+    let mut msbaro = Ms5611::new(spi4_port, spi4_cs1, &mut delay_source).unwrap();
+    let mut flash = spi_memory::series25::Flash::init(spi2_port, spi2_cs1).unwrap();
+    if let Err(flash_err) = flash.read_jedec_id() {
+        panic!("flash error: {:?}", flash_err);
+    }
 
-    let mut msbaro = Ms5611::new(spi_bus4.acquire(), spi4_cs1, &mut delay_source).unwrap();
 
     // TODO troubleshoot SPI1  reads -- probe is consistently failing
     let mut spi1_success = true;

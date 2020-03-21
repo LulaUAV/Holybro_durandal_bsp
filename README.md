@@ -30,8 +30,8 @@ This is very much work-in-progress
 - [x] IST8310 internal magnetometer reading (use new ist8310 crate)
 - [x] initial clock configuration to match max Durandal specs
 - [x] All internal SPI bus access (`SPI1`, `SPI4`)
-- [ ] ICM20689 internal 6DOF reading (creating ehal driver)
-- [ ] BMI088 internal 6DOF reading internal SPI (creating ehal driver)
+- [x] BMI088 internal 6DOF reading internal SPI (use new BMI088 driver)
+- [ ] ICM20689 internal 6DOF reading (new driver is unconfirmed)
 - [ ] External SPI bus access
 - [ ] Internal I2C bus access
 - [ ] External "I2C B" bus access (`I2C2`)
