@@ -1,3 +1,10 @@
+/*
+Copyright (c) 2020 Todd Stellanova
+LICENSE: BSD3 (see LICENSE file)
+*/
+
+
+
 #![no_std]
 #![no_main]
 
@@ -27,6 +34,7 @@ use embedded_hal as ehal;
 use embedded_graphics::fonts::Font6x8;
 use embedded_graphics::prelude::*;
 use ssd1306::prelude::*;
+use ssd1306::interface::DisplayInterface;
 
 use arrayvec::ArrayString;
 use core::fmt;
@@ -47,12 +55,10 @@ mod port_types;
 
 use crate::port_types::{HalGpioError, HalI2cError, HalSpiError, Uart7PortType};
 use cortex_m::asm::bkpt;
-use embedded_hal::digital::v2::InputPin;
-// use embedded_hal::serial;
+
 use p_hal::pwr::VoltageScale;
 use p_hal::rcc::PllConfigStrategy;
 use p_hal::serial::config::{Parity, StopBits, WordLength};
-use ssd1306::interface::DisplayInterface;
 
 
 // cortex-m-rt is setup to call DefaultHandler for a number of fault conditions
@@ -70,36 +76,27 @@ fn HardFault(ef: &ExceptionFrame) -> ! {
 }
 
 
-
 fn setup_peripherals() -> (
     // i2c3
     // InternalI2cPortType
     impl ehal::blocking::i2c::Read<Error = HalI2cError>
         + ehal::blocking::i2c::Write<Error = HalI2cError>
         + ehal::blocking::i2c::WriteRead<Error = HalI2cError>,
-    // i2c4
-    // ExternI2cPortAType,
+    // i2c4: ExternI2cPortAType,
     impl ehal::blocking::i2c::Read<Error = HalI2cError>
         + ehal::blocking::i2c::Write<Error = HalI2cError>
         + ehal::blocking::i2c::WriteRead<Error = HalI2cError>,
-    // spi1
-    //Spi1PortType,
+    // spi1 :Spi1PortType,
     impl ehal::blocking::spi::Transfer<u8, Error = HalSpiError>
         + ehal::blocking::spi::Write<u8, Error = HalSpiError>,
-    // SPI CS and DRDY pins for TDK IMU
-    (
-        //spi1_cs_tdk
-        impl OutputPin<Error = HalGpioError>,
-        //spi1_drdy_tdk
-        impl InputPin<Error = HalGpioError>,
-    ),
+    // SPI pins for ICM20689
+    impl OutputPin<Error = HalGpioError>, // ICM20689 CS
     // SPI pins for BMI088
     (
-        impl OutputPin<Error = HalGpioError>, // BMI088 gyro
-        impl OutputPin<Error = HalGpioError>, // BMI088 accel
+        impl OutputPin<Error = HalGpioError>, // BMI088 gyro CS
+        impl OutputPin<Error = HalGpioError>, // BMI088 accel CS
     ),
-    // spi4
-    //Spi4PortType,
+    // spi4 : Spi4PortType,
     impl ehal::blocking::spi::Transfer<u8, Error = HalSpiError>
         + ehal::blocking::spi::Write<u8, Error = HalSpiError>,
     // spi4_cs1
@@ -191,12 +188,12 @@ fn setup_peripherals() -> (
     //PF2 is CS for TDK ICM20689 (2 MHz - 8 MHz)
     let mut spi1_cs_tdk = gpiof
         .pf2
-        .into_push_pull_output()
-        .set_speed(p_hal::gpio::Speed::Low);
+        .into_push_pull_output();
+        //.set_speed(p_hal::gpio::Speed::Low); //TODO verify
     spi1_cs_tdk.set_high().unwrap();
 
     //PB4 is DRDY for TDK ICM20689
-    let spi1_drdy_tdk = gpiob.pb4.into_floating_input();
+    //let spi1_drdy_tdk = gpiob.pb4.into_floating_input();
 
     // PF4 is SPI1 CS4 BMI088 gyro
     let mut spi1_cs_bmi088_gyro = gpiof.pf4.into_push_pull_output();
@@ -210,8 +207,7 @@ fn setup_peripherals() -> (
         let sck = gpioe.pe2.into_alternate_af5();
         let miso = gpioe.pe13.into_alternate_af5();
         let mosi = gpioe.pe6.into_alternate_af5();
-        dp.SPI4
-            .spi((sck, miso, mosi), ehal::spi::MODE_3, 2.mhz(), &ccdr)
+        dp.SPI4.spi((sck, miso, mosi), ehal::spi::MODE_3, 2.mhz(), &ccdr)
     };
     let mut spi4_cs1 = gpiof.pf10.into_push_pull_output();
     spi4_cs1.set_high().unwrap();
@@ -233,7 +229,7 @@ fn setup_peripherals() -> (
         i2c3_port,
         i2c4_port,
         spi1_port,
-        (spi1_cs_tdk, spi1_drdy_tdk),
+        spi1_cs_tdk,
         (spi1_cs_bmi088_gyro, spi1_cs_bmi088_accel),
         spi4_port,
         spi4_cs1,
@@ -286,7 +282,7 @@ fn main() -> ! {
         i2c3_port,
         i2c4_port,
         spi1_port,
-        (spi1_cs_tdk, _spi1_drdy_tdk),
+        spi1_cs_tdk,
         (spi1_cs_bmi088_gyro, spi1_cs_bmi088_accel),
         spi4_port,
         spi4_cs1,
