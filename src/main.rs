@@ -59,6 +59,7 @@ use cortex_m::asm::bkpt;
 use p_hal::pwr::VoltageScale;
 use p_hal::rcc::PllConfigStrategy;
 use p_hal::serial::config::{Parity, StopBits, WordLength};
+use spi_memory::series25::Identification;
 
 
 // cortex-m-rt is setup to call DefaultHandler for a number of fault conditions
@@ -194,8 +195,8 @@ fn setup_peripherals() -> (
     //PF2 is CS for TDK ICM20689 (2 MHz - 8 MHz)
     let mut spi1_cs_tdk = gpiof
         .pf2
-        .into_push_pull_output();
-        //.set_speed(p_hal::gpio::Speed::Low); //TODO should be 2 MHz
+        .into_push_pull_output()
+        .set_speed(p_hal::gpio::Speed::Low); //TODO verify: should be 2 MHz
     spi1_cs_tdk.set_high().unwrap();
 
     //PB4 is DRDY for TDK ICM20689
@@ -258,13 +259,14 @@ fn setup_peripherals() -> (
     )
 }
 
-fn local_println(po_tx: &mut impl Write, args: Arguments<'_>) {
-    let mut format_buf = ArrayString::<[u8; 24]>::new();
+fn local_println(po_tx: &mut (impl Write + ehal::serial::Write<u8>), args: Arguments<'_>) {
+    let mut format_buf = ArrayString::<[u8; 64]>::new();
     format_buf.clear();
     if fmt::write(&mut format_buf, args).is_ok() {
         let le_str = format_buf.as_str();
         //write on console out
-        po_tx.write_str(le_str).unwrap();
+        let _ = po_tx.write_str(le_str);
+        let _ = po_tx.flush();
     }
 }
 
@@ -333,36 +335,31 @@ fn main() -> ! {
     let mut mag = IST8310::default(i2c_bus3.acquire()).unwrap();
     let mut msbaro = Ms5611::new(spi4_port, spi4_cs1, &mut delay_source).unwrap();
     let mut flash = spi_memory::series25::Flash::init(spi2_port, spi2_cs1).unwrap();
-    if let Err(flash_err) = flash.read_jedec_id() {
-        panic!("flash error: {:?}", flash_err);
+    if let Ok(flash_id) = flash.read_jedec_id() {
+        // we expect 0xC2, 0x22, 0x08 for Cypress FM25V02A identifier: 7F 7F 7F 7F 7F 7F C2 22 08
+        if flash_id.mfr_code() != 0xC2 {
+            local_println(&mut po_tx, format_args!("unexpected flash_id: {:?}\r\n", flash_id));
+        }
     }
-
-
-    // TODO troubleshoot SPI1  reads -- probe is consistently failing
-    let mut spi1_success = true;
 
     let mut bmi088_a = bmi088::Builder::new_accel_spi(spi_bus1.acquire(), spi1_cs_bmi088_accel);
     if bmi088_a.setup(&mut delay_source).is_err() {
-        spi1_success = false;
         local_println(&mut po_tx, format_args!("bmi088_a failed\r\n"));
     }
 
     let mut bmi088_g = bmi088::Builder::new_gyro_spi(spi_bus1.acquire(), spi1_cs_bmi088_gyro);
     if bmi088_g.setup(&mut delay_source).is_err() {
-        spi1_success = false;
         local_println(&mut po_tx, format_args!("bmi088_g failed\r\n"));
     }
 
+    // TODO troubleshoot icm20689  -- probe is consistently failing
     let mut tdk_6dof = icm20689::Builder::new_spi(spi_bus1.acquire(), spi1_cs_tdk);
     if tdk_6dof.setup(&mut delay_source).is_err() {
-        spi1_success = false;
         local_println(&mut po_tx, format_args!("icm20689 failed\r\n"));
     }
 
-    if !spi1_success {
-        local_println(&mut po_tx, format_args!("--- SPI1 FAIL --- \r\n"));
-        bkpt();
-    }
+
+   // bkpt();
 
     let _ = user_led1.set_low();
     let mut last_accel: [i16; 3] = [0; 3];
@@ -370,6 +367,11 @@ fn main() -> ! {
     let mut last_mag: [i16; 3] = [0; 3];
     let mut last_press;
     loop {
+
+        if let Ok(flash_status) = flash.read_status() {
+            local_println(&mut po_tx, format_args!("flash_status: {:?}\r\n", flash_status));
+        }
+
         // if let Ok(gyro_sample) = tdk_6dof.get_gyro() {
         //     last_gyro = gyro_sample;
         //     local_println(&mut po_tx, format_args!("gyro_i: {:?}\r\n", last_gyro));
