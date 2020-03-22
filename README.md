@@ -31,25 +31,27 @@ This is very much work-in-progress
 - [x] initial clock configuration to match max Durandal specs
 - [x] All internal SPI bus access (`SPI1`, `SPI4`)
 - [x] BMI088 internal 6DOF reading internal SPI (use new BMI088 driver)
-- [ ] ICM20689 internal 6DOF reading (new driver is unconfirmed)
+- [ ] ICM20689 internal 6DOF reading (new driver is unconfirmed with actual hardware)
+- [x] Basic SPI flash ram (FRAM) access (using updated spi-memory driver)
+- [ ] Reading S.Bus RC input port (3-pin PWM connector labeled "RC IN" on Durandal)
 - [ ] External SPI bus access
 - [ ] Internal I2C bus access
 - [ ] External "I2C B" bus access (`I2C2`)
+- [ ] Reading battery status ports (using ADC?)
 - [ ] Telem 1, 2, 3, 4 serial port access (uart)
 - [ ] SDMMC read/write
+- [ ] GPS port access
 - [ ] Running on RTOS
 - [ ] USB-C serial I/O
-- [ ] S.Bus or CPPM input (radio control)
-- [ ] GPS port access
 - [ ] External GPS reading (eg ublox Neo-M8N GPS, see ublox crate)
-- [ ] FMU PWM output 
-- [ ] IO PWM output
+- [ ] FMU PWM output (requires PMW driver?)
+- [ ] PX4IO PWM output (requires new p4xio driver)
 - [ ] CAN bus access
 - [ ] Calibration routine for IMUs
 - [ ] Semihosting debug support via dronecode debug port
 - [ ] CI
 - [ ] Documentation
-- [ ] IST8310 external i2c mag (use ist8310 crate)
+- [ ] Reading DSM RC input port (port labeled "DSM" on Durandal)
 - [ ] hmc5883 external mag (no existing ehal driver?)
 - [ ] qmc5883 external mag (no existing ehal driver?)
 - [ ] LIS3MDL external mag (no existing ehal driver? see LSM303c?)
