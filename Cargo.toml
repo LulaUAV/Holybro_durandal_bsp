@@ -9,7 +9,7 @@ version = "0.1.0"
 embedded-hal = "0.2.3"
 cortex-m = "0.6.0"
 cortex-m-rt = "0.6.10"
-cortex-m-semihosting = "0.3.3"
+cortex-m-semihosting = "0.3.5"
 panic-halt = "0.2.0"
 panic-semihosting = "0.5.3"
 shared-bus = {version = "0.1.4", features = ["cortexm"] }
@@ -26,15 +26,22 @@ ms5611-spi =  { git = "https://github.com/tstellanova/ms5611-ehal" }
 ist8310 =  { git = "https://github.com/tstellanova/ist8310" }
 #ist8310 = { path = "../ist8310"}
 
-#icm20689 =  { git = "https://github.com/tstellanova/icm20689" }
-icm20689 = { path = "../icm20689"}
+icm20689 =  { git = "https://github.com/tstellanova/icm20689" }
+#icm20689 = { path = "../icm20689"}
 
 bmi088 =  { git = "https://github.com/tstellanova/bmi088" }
 #bmi088 = { path = "../bmi088"}
 
+ublox-core =  { git = "https://github.com/tstellanova/ublox-core" }
+#ublox-core = { path = "../ublox-core"}
+
+# rgbled
+#tca62724fmg = { path = "../tca62724fmg"}
+tca62724fmg =  { git = "https://github.com/tstellanova/tca62724fmg" }
+
 # flash memory
-spi-memory = {git = "https://github.com/tstellanova/spi-memory"}
 #spi-memory = { path = "../spi-memory"}
+spi-memory = { git = "https://github.com/tstellanova/spi-memory" }
 
 
 # stm32 family specialization:
@@ -42,5 +49,4 @@ stm32h7 = { version = "0.10.0", features = ["stm32h743"] }
 #stm32h7xx-hal = { version = "0.4.0", features = ["stm32h743", "rt"] }
 stm32h7xx-hal = { git = "https://github.com/stm32-rs/stm32h7xx-hal", features = ["stm32h743", "rt"] }
 #stm32h7xx-hal = { path = "../stm32h7xx-hal",  features = ["stm32h743", "rt"] }
-
 

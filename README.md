@@ -126,6 +126,12 @@ Format: `(RX, TX)` , `(CTS, RTS)`
 - UART8 is IOMCU: `(PE0, PE1)`
 
 
+## External Accessories
+
+- We added an oled
+- The GPS module sold with the Durandal: ublox Neo-M8N GPS/GLONASS ; integrated magnetometer IST8310
+- 
+
 ## License
 
 BSD-3-Clause, see `LICENSE` file. 

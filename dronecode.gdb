@@ -11,6 +11,7 @@ set backtrace limit 32
 #break HardFault
 #break rust_begin_unwind
 #break panic
+
 # # run the next few lines so the panic message is printed immediately
 # # the number needs to be adjusted for your panic handler
 # commands $bpnum
@@ -35,14 +36,18 @@ attach 1
 # monitor tpiu config external uart off 8000000 2000000
 
 # # enable ITM port 0
-#monitor itm port 0 on
-#monitor arm semihosting enable
+# monitor itm port 0 on
+# monitor arm semihosting enable
 
+# don't confirm when quitting debugger
+define hook-quit
+    set confirm off
+end
 
 
 load
 
 # start the process but immediately halt the processor
-stepi
+# stepi
 
-#continue
+continue
