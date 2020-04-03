@@ -130,7 +130,10 @@ Format: `(RX, TX)` , `(CTS, RTS)`
 
 - We added an oled
 - The GPS module sold with the Durandal: ublox Neo-M8N GPS/GLONASS ; integrated magnetometer IST8310
-- 
+
+## Resources
+- [Durandal wiring guide](https://docs.px4.io/master/en/assembly/quick_start_durandal.html)
+- [Durandal schematic](durandal_schematic_201901.pdf)
 
 ## License
 
