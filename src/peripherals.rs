@@ -11,6 +11,7 @@ use ehal::digital::v2::OutputPin;
 use ehal::digital::v2::ToggleableOutputPin;
 use embedded_hal as ehal;
 
+
 use crate::port_types::{DbgUartPortType, Gps1PortType, HalGpioError, HalI2cError, HalSpiError};
 
 use p_hal::pwr::VoltageScale;
@@ -216,7 +217,7 @@ pub fn setup_peripherals() -> (
     let mut spi4_cs1 = gpiof.pf10.into_push_pull_output();
     spi4_cs1.set_high().unwrap();
 
-    //UART7 is debug (dronecode port): `(PF6, PE8)`
+    // UART7 is debug serial console (dronecode debug port)
     let uart7_port = {
         let config = p_hal::serial::config::Config {
             baudrate: 57_600_u32.bps(),
@@ -227,6 +228,19 @@ pub fn setup_peripherals() -> (
         let rx = gpiof.pf6.into_alternate_af7();
         let tx = gpioe.pe8.into_alternate_af7();
         dp.UART7.usart((tx, rx), config, &mut ccdr).unwrap()
+    };
+
+    // UART8 is the serial connection to the px4io IO coprocessor
+    let _uart8_port = {
+        let config = p_hal::serial::config::Config {
+            baudrate: 1_500_000_u32.bps(),
+            wordlength: WordLength::DataBits8,
+            parity: Parity::ParityNone,
+            stopbits: StopBits::STOP1,
+        };
+        let rx = gpioe.pe0.into_alternate_af8();
+        let tx = gpioe.pe1.into_alternate_af8();
+        dp.UART8.usart((tx, rx), config, &mut ccdr).unwrap()
     };
 
     // USART1 is GPS1 port:
