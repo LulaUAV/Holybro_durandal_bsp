@@ -9,18 +9,17 @@ use stm32::I2C1;
 use stm32::I2C3;
 use stm32::I2C4;
 
-
 use stm32::SPI1;
 use stm32::SPI4;
 use stm32::UART7;
-// use shared_bus::BusManager;
+use stm32::USART1;
 
 pub type HalI2cError = p_hal::i2c::Error;
 pub type HalSpiError = p_hal::spi::Error;
 pub type HalGpioError = p_hal::Never;
+pub type HalSerialError = p_hal::serial::Error;
 
-
-
+// use shared_bus::BusManager;
 // type SharedBusType<T> = BusManager<shared_bus::BusMutex<cell::RefCell<T>>, T>;
 
 type I2c1PortType = p_hal::i2c::I2c<
@@ -71,12 +70,21 @@ pub type Spi4PortType = p_hal::spi::Spi<
 >;
 // pub type Spi4BusType = SharedBusType<Spi4PortType>;
 
-pub type Uart7PortType = p_hal::serial::Serial<
+type Uart7PortType = p_hal::serial::Serial<
     UART7,
     (
         p_hal::gpio::gpioe::PE8<p_hal::gpio::Alternate<p_hal::gpio::AF7>>,
         p_hal::gpio::gpiof::PF6<p_hal::gpio::Alternate<p_hal::gpio::AF7>>,
     ),
 >;
+pub type DbgUartPortType = Uart7PortType;
+// pub type DbgUartTxType = p_hal::serial::Tx<Uart7PortType>;
 
-pub type DbgUartTxType = p_hal::serial::Tx<Uart7PortType>;
+type Usart1PortType = p_hal::serial::Serial<
+    USART1,
+    (
+        p_hal::gpio::gpiob::PB6<p_hal::gpio::Alternate<p_hal::gpio::AF7>>,
+        p_hal::gpio::gpiob::PB7<p_hal::gpio::Alternate<p_hal::gpio::AF7>>,
+    ),
+>;
+pub type Gps1PortType = Usart1PortType;
