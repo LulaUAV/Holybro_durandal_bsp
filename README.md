@@ -1,11 +1,12 @@
-## durandal_play 
+## durandal_bsp
 
-An environment for experimenting with rust on 
+A board support package for experimenting with rust on 
 the [Durandal](https://shop.holybro.com/c/durandal_0505)
  stm32h7-based flight controller.
 
 For installation and debugging use either 
-openocd (built with stm32h743 support)or the 
+- RTT / Segger J-Link
+- openocd (built with stm32h743 support)or the 
 [daily build of the Black Magic Probe firmware](https://github.com/blacksphere/blackmagic/wiki/Upgrading-Firmware)
 (which also requires recently introduced stm32h743 support).
 We've used the 
@@ -33,6 +34,7 @@ This is very much work-in-progress
 - [x] BMI088 internal 6DOF reading internal SPI (use new BMI088 driver)
 - [ ] ICM20689 internal 6DOF reading (new driver is unconfirmed with actual hardware)
 - [x] Basic SPI flash ram (FRAM) access (using updated spi-memory driver)
+- [ ] RTT debug support via droncode debug port
 - [ ] Reading S.Bus RC input port (3-pin PWM connector labeled "RC IN" on Durandal)
 - [ ] External SPI bus access
 - [ ] Internal I2C bus access
@@ -48,7 +50,6 @@ This is very much work-in-progress
 - [ ] PX4IO PWM output (requires new p4xio driver)
 - [ ] CAN bus access
 - [ ] Calibration routine for IMUs
-- [ ] Semihosting debug support via dronecode debug port
 - [ ] CI
 - [ ] Documentation
 - [ ] Reading DSM RC input port (port labeled "DSM" on Durandal)

@@ -6,14 +6,8 @@ LICENSE: BSD3 (see LICENSE file)
 #![no_std]
 #![no_main]
 
-// pick a panicking behavior
-// extern crate panic_abort; // requires nightly
-// extern crate panic_itm; // logs messages over ITM; requires ITM support
 
-#[cfg(not(debug_assertions))]
-extern crate panic_halt; // you can put a breakpoint on `rust_begin_unwind` to catch panics
-#[cfg(debug_assertions)]
-extern crate panic_semihosting; // logs messages to the host stderr; requires a debugger
+use panic_rtt_core::{self, rprintln, rtt_init_print};
 
 
 use cortex_m_rt::{entry, exception, ExceptionFrame};
@@ -114,6 +108,9 @@ fn render_vec3<DI: DisplayInterface>(
 
 #[entry]
 fn main() -> ! {
+    rtt_init_print!(NoBlockTrim);
+    rprintln!("-- > MAIN --");
+
     let (
         i2c1_port,
         i2c2_port,
