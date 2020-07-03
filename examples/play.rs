@@ -15,7 +15,10 @@ extern crate panic_halt; // you can put a breakpoint on `rust_begin_unwind` to c
 #[cfg(debug_assertions)]
 extern crate panic_semihosting; // logs messages to the host stderr; requires a debugger
 
-use cortex_m_rt::{entry, ExceptionFrame};
+
+use cortex_m_rt::{entry, exception, ExceptionFrame};
+
+use durandal_bsp::peripherals;
 
 use ehal::blocking::delay::DelayMs;
 use ehal::digital::v2::OutputPin;
@@ -34,7 +37,6 @@ use core::fmt::{Arguments, Write};
 
 // use p_hal::time::U32Ext;
 
-use cortex_m::asm::bkpt;
 /// Sensors
 use ist8310::IST8310;
 use ms5611::{Ms5611, Oversampling};
@@ -43,13 +45,7 @@ use ms5611_spi as ms5611;
 // use ncp5623c::NCP5623C;
 use tca62724fmg::TCA62724FMG;
 
-#[macro_use]
-extern crate cortex_m_rt;
 
-#[allow(dead_code)]
-mod port_types;
-
-mod peripherals;
 
 // use crate::port_types::{HalGpioError, HalI2cError, HalSpiError, DbgUartPortType, Gps1PortType};
 //

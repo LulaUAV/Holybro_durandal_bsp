@@ -18,20 +18,7 @@ use p_hal::pwr::VoltageScale;
 use p_hal::rcc::PllConfigStrategy;
 use p_hal::serial::config::{Parity, StopBits, WordLength};
 
-// pub fn set_max_bps(port: &mut Gps1PortType, bps: u32) {
-//
-//     //get the initial baud rate
-//     //set a series of baud rates until we find a speed that works
-//
-//     let config = p_hal::serial::config::Config {
-//         baudrate: bps.bps(),
-//         wordlength: WordLength::DataBits8,
-//         parity: Parity::ParityNone,
-//         stopbits: StopBits::STOP1,
-//     };
-//     port.set_config(config);
-//
-// }
+
 
 pub fn setup_peripherals() -> (
     // i2c1
