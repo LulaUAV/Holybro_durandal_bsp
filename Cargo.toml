@@ -14,8 +14,8 @@ cortex-m = "0.6.0"
 cortex-m-rt = "0.6.10"
 # stm32 family specialization:
 stm32h7 = { version = "0.10.0", features = ["stm32h743"] }
-#stm32h7xx-hal = { version = "0.4.0", features = ["stm32h743", "rt"] }
-stm32h7xx-hal = { git = "https://github.com/stm32-rs/stm32h7xx-hal", features = ["stm32h743", "rt"] }
+stm32h7xx-hal = { version = "0.4.0", features = ["stm32h743", "rt"] }
+#stm32h7xx-hal = { git = "https://github.com/stm32-rs/stm32h7xx-hal", features = ["stm32h743", "rt"] }
 #stm32h7xx-hal = { path = "../stm32h7xx-hal",  features = ["stm32h743", "rt"] }
 
 [dev-dependencies]
